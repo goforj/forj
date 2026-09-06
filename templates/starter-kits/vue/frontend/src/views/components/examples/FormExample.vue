@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import { toast } from 'vue-sonner'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { zodRule } from '@/lib/zod-rule'
 
-const schema = toTypedSchema(z.object({
-  name: z.string().min(3, 'Project name must be at least 3 characters.'),
-  ownerEmail: z.string().email('Enter a valid email address.'),
-}))
+const schema = z.object({
+  name: z.string().min(3, { error: 'Project name must be at least 3 characters.' }),
+  ownerEmail: z.email({ error: 'Enter a valid email address.' }),
+})
 
-const { handleSubmit } = useForm({
-  validationSchema: schema,
+const { handleSubmit } = useForm<z.infer<typeof schema>>({
+  validationSchema: {
+    name: zodRule(schema.shape.name),
+    ownerEmail: zodRule(schema.shape.ownerEmail),
+  },
   initialValues: { name: 'Acme Admin', ownerEmail: 'team@example.com' },
 })
 

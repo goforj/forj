@@ -10,6 +10,17 @@ const frontendRoot = path.join(repositoryRoot, 'templates/starter-kits/vue/front
 const requireFromFrontend = createRequire(path.join(frontendRoot, 'package.json'))
 const viteEntry = requireFromFrontend.resolve('vite')
 const { build } = await import(pathToFileURL(viteEntry).href)
+const { z } = await import(pathToFileURL(requireFromFrontend.resolve('zod')).href)
+const { zodRule } = await import(pathToFileURL(path.join(frontendRoot, 'src/lib/zod-rule.ts')).href)
+
+test('Zod field rules preserve successful values and validation messages', () => {
+  const rule = zodRule(z.string().min(3, { error: 'Enter at least three characters.' }))
+  const emailRule = zodRule(z.email({ error: 'Enter a valid email address.' }))
+
+  assert.equal(rule('valid'), true)
+  assert.equal(rule(''), 'Enter at least three characters.')
+  assert.equal(emailRule('invalid'), 'Enter a valid email address.')
+})
 
 test('the production graph retains the complete component showroom', async () => {
   let moduleIDs = []

@@ -112,15 +112,18 @@ func TestScaffoldStarterKitPreservesExistingFrontendFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read Vue starter package: %v", err)
 	}
-	for _, expected := range []string{"@internationalized/date", "@lucide/vue", `"vite":`} {
+	for _, expected := range []string{"@internationalized/date", "@lucide/vue", `"vite":`, `"zod": "^4.5.4"`} {
 		if !strings.Contains(string(packageJSON), expected) {
 			t.Errorf("Vue starter package omitted %q:\n%s", expected, packageJSON)
 		}
 	}
-	for _, obsolete := range []string{"lucide-vue-next", `"shadcn-vue"`} {
+	for _, obsolete := range []string{"lucide-vue-next", `"shadcn-vue"`, `"@vee-validate/zod"`} {
 		if strings.Contains(string(packageJSON), obsolete) {
 			t.Errorf("Vue starter package retained obsolete install dependency %q:\n%s", obsolete, packageJSON)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(frontendDir, "src", "lib", "zod-rule.ts")); err != nil {
+		t.Fatalf("expected Zod rule adapter to exist: %v", err)
 	}
 }
 
