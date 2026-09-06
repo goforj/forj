@@ -13,12 +13,12 @@ templ OverlaysPage(data PageData) {
 							</div>
 							<div class="card-content">
 								<div class="card-actions">
-									<button class="btn-primary" type="button" data-gf-open-dialog="invite-dialog">Open invite dialog</button>
-									<button class="btn-destructive" type="button" data-gf-open-dialog="archive-dialog">Archive project</button>
+									<button class="btn" data-variant="primary" type="button" data-gf-open-dialog="invite-dialog">Open invite dialog</button>
+									<button class="btn" data-variant="destructive" type="button" data-gf-open-dialog="archive-dialog">Archive project</button>
 								</div>
 								<div class="card-actions">
-									<button class="btn-outline" type="button" data-gf-open-dialog="inspector-sheet">Open side sheet</button>
-									<button class="btn-outline" type="button" data-gf-open-dialog="mobile-drawer">Open mobile drawer</button>
+									<button class="btn" data-variant="outline" type="button" data-gf-open-dialog="inspector-sheet">Open side sheet</button>
+									<button class="btn" data-variant="outline" type="button" data-gf-open-dialog="mobile-drawer">Open mobile drawer</button>
 								</div>
 							</div>
 						</section>
@@ -31,12 +31,12 @@ templ OverlaysPage(data PageData) {
 								<div class="demo-card">
 									<strong>Command palette</strong>
 									<p>This uses the same command primitives that power the shell-level shortcut.</p>
-									<div class="card-actions"><button class="btn-primary" type="button" data-gf-open-dialog="gf-command-menu">Open command menu</button></div>
+									<div class="card-actions"><button class="btn" data-variant="primary" type="button" data-gf-open-dialog="gf-command-menu">Open command menu</button></div>
 								</div>
 								<div class="demo-card">
 									<strong>Toast feedback</strong>
 									<p>Toasts are useful for non-blocking confirmation after save, sync, or authentication actions.</p>
-									<div class="card-actions"><button class="btn-outline" type="button" data-gf-toast="success" data-gf-toast-title="Starter preview saved" data-gf-toast-description="This toast is rendered by the local templ starter controller.">Show success toast</button><button class="btn-outline" type="button" data-gf-toast="info" data-gf-toast-title="Signed out" data-gf-toast-description="Non-blocking notifications are ready for auth and settings flows.">Show signed-out toast</button></div>
+									<div class="card-actions"><button class="btn" data-variant="outline" type="button" data-gf-toast="success" data-gf-toast-title="Starter preview saved" data-gf-toast-description="This toast is rendered by the local templ starter controller.">Show success toast</button><button class="btn" data-variant="outline" type="button" data-gf-toast="info" data-gf-toast-title="Signed out" data-gf-toast-description="Non-blocking notifications are ready for auth and settings flows.">Show signed-out toast</button></div>
 								</div>
 							</div>
 						</section>
@@ -45,7 +45,7 @@ templ OverlaysPage(data PageData) {
 						<h2>Popover details, tooltips, and row actions</h2>
 						<div class="preview-grid">
 							<div class="popover" id="starter-api-popover">
-								<button id="starter-api-popover-trigger" type="button" class="btn-outline" aria-expanded="false" aria-controls="starter-api-popover-content">Production API</button>
+								<button id="starter-api-popover-trigger" type="button" class="btn" data-variant="outline" aria-expanded="false" aria-controls="starter-api-popover-content">Production API</button>
 								<div id="starter-api-popover-content" data-popover aria-hidden="true" class="w-80">
 									<div class="grid gap-4">
 										<header class="grid gap-1.5"><h3 class="leading-none font-medium">Production API</h3><p class="text-muted-foreground text-sm">Healthy, 128 requests in the last hour, p95 latency under 80ms.</p></header>
@@ -53,7 +53,7 @@ templ OverlaysPage(data PageData) {
 									</div>
 								</div>
 							</div>
-							<div class="demo-card"><strong>Tooltip syntax</strong><p>Tooltips are attached with data attributes.</p><button class="btn-outline" type="button" data-tooltip="Inspect the deployment before promoting." data-side="bottom" data-align="start">Hover for tooltip</button></div>
+							<div class="demo-card"><strong>Tooltip syntax</strong><p>Tooltips are attached with data attributes.</p><button class="btn" data-variant="outline" type="button" data-tooltip="Inspect the deployment before promoting." data-side="bottom" data-align="start">Hover for tooltip</button></div>
 							<div class="sheet-preview"><div>Deployment complete<span>now</span></div><div>Password updated<span>now</span></div><div>Queue worker restarted<span>now</span></div></div>
 						</div>
 					</section>
@@ -76,8 +76,8 @@ templ overlayDialogs() {
 					</form>
 				</section>
 				<footer>
-					<button class="btn-outline" type="button" data-gf-close-dialog>Cancel</button>
-					<button class="btn-primary" type="button" data-gf-close-dialog data-gf-toast="success" data-gf-toast-title="Invite sent" data-gf-toast-description="The teammate invite flow is wired through the shared overlay controller.">Send invite</button>
+					<button class="btn" data-variant="outline" type="button" data-gf-close-dialog>Cancel</button>
+					<button class="btn" data-variant="primary" type="button" data-gf-close-dialog data-gf-toast="success" data-gf-toast-title="Invite sent" data-gf-toast-description="The teammate invite flow is wired through the shared overlay controller.">Send invite</button>
 				</footer>
 				<button type="button" aria-label="Close dialog" data-gf-close-dialog>@iconClose()</button>
 			</div>
@@ -89,8 +89,8 @@ templ overlayDialogs() {
 					<p>Reserve alert dialogs for destructive actions rather than routine confirmations.</p>
 				</header>
 				<footer>
-					<button class="btn-outline" type="button" data-gf-close-dialog>Cancel</button>
-					<button class="btn-destructive" type="button" data-gf-close-dialog>Archive</button>
+					<button class="btn" data-variant="outline" type="button" data-gf-close-dialog>Cancel</button>
+					<button class="btn" data-variant="destructive" type="button" data-gf-close-dialog>Archive</button>
 				</footer>
 				<button type="button" aria-label="Close dialog" data-gf-close-dialog>@iconClose()</button>
 			</div>
@@ -106,9 +106,9 @@ templ overlayDialogs() {
 					<div class="demo-card"><strong>Recent events</strong><div class="item-list">@activityItem("Release promoted", "Production rollout completed without errors.")@activityItem("Health check recovered", "A brief API spike resolved automatically after autoscaling.")@activityItem("Audit trail captured", "Configuration changes were recorded for the current deploy group.")</div></div>
 				</section>
 				<footer>
-					<button class="btn-primary" type="button">Open logs</button>
-					<button class="btn-outline" type="button">Restart worker</button>
-					<button class="btn-outline" type="button" data-gf-close-dialog>Close</button>
+					<button class="btn" data-variant="primary" type="button">Open logs</button>
+					<button class="btn" data-variant="outline" type="button">Restart worker</button>
+					<button class="btn" data-variant="outline" type="button" data-gf-close-dialog>Close</button>
 				</footer>
 				<button type="button" aria-label="Close dialog" data-gf-close-dialog>@iconClose()</button>
 			</div>
@@ -117,8 +117,8 @@ templ overlayDialogs() {
 			<div class="dialog-panel">
 				<div><h2>Mobile actions</h2><p class="muted">Drawers are often a better fit than centered modals for small-screen action clusters.</p></div>
 				<div class="demo-card"><strong>Queued deployment</strong><p class="metric-value">Version 24</p><p>Promote now, inspect release notes, or dismiss this action sheet.</p></div>
-				<div class="control-list"><button class="btn-primary w-full" type="button">Create deployment</button><button class="btn-outline w-full" type="button">View docs</button><button class="btn-outline w-full" type="button">Review release notes</button></div>
-				<div class="dialog-actions"><button class="btn-outline" type="button" data-gf-close-dialog>Done</button></div>
+				<div class="control-list"><button class="btn w-full" data-variant="primary" type="button">Create deployment</button><button class="btn w-full" data-variant="outline" type="button">View docs</button><button class="btn w-full" data-variant="outline" type="button">Review release notes</button></div>
+				<div class="dialog-actions"><button class="btn" data-variant="outline" type="button" data-gf-close-dialog>Done</button></div>
 			</div>
 		</dialog>
 	}

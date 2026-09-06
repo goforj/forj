@@ -29,13 +29,13 @@ templ LoginPage(data LoginPageData) {
 					<div class="field">
 						<span>Password</span>
 						<div class="password-field">
-							<input name="password" type="password" autocomplete="current-password" placeholder="Password"/>
+							<input class="input" name="password" type="password" autocomplete="current-password" placeholder="Password"/>
 							<button type="button">Show</button>
 						</div>
 						<a class="field-link" href="/forgot-password">Forgot password?</a>
 					</div>
 					<label class="label gap-3 font-normal text-muted-foreground"><input class="input" name="remember" type="checkbox"/> Remember me</label>
-				<button class="btn-primary w-full" type="submit">Log in</button>
+				<button class="btn w-full" data-variant="primary" type="submit">Log in</button>
 				<div class="auth-signup">Don't have an account? <a href="/register">Sign up</a></div>
 			</form>
 		}
@@ -48,7 +48,7 @@ templ RegisterPage(data LoginPageData) {
 				<label class="field"><span>Email address</span><input type="email" autocomplete="email" placeholder="email@example.com"/></label>
 				<label class="field"><span>Password</span><input type="password" autocomplete="new-password" placeholder="Password"/></label>
 				<label class="field"><span>Confirm password</span><input type="password" autocomplete="new-password" placeholder="Confirm password"/></label>
-				<button class="btn-primary w-full" type="button">Create account</button>
+				<button class="btn w-full" data-variant="primary" type="button">Create account</button>
 				<div class="auth-links"><a href="/login">Log in</a></div>
 			</form>
 		}
@@ -58,7 +58,7 @@ templ ForgotPasswordPage(data LoginPageData) {
 			<form class="form">
 				<div><h1>Forgot password</h1><p>Enter your email to receive a password reset link</p></div>
 				<label class="field"><span>Email address</span><input type="email" autocomplete="off" placeholder="email@example.com"/></label>
-				<button class="btn-primary w-full" type="button">Email password reset link</button>
+				<button class="btn w-full" data-variant="primary" type="button">Email password reset link</button>
 				<div class="auth-links"><a href="/login">Back to sign in</a></div>
 			</form>
 		}
@@ -69,7 +69,7 @@ templ ResetPasswordPage(data LoginPageData) {
 				<div><h1>Reset password</h1><p>Please enter your new password below</p></div>
 				<label class="field"><span>New password</span><input type="password" autocomplete="new-password" placeholder="New password"/></label>
 				<label class="field"><span>Confirm new password</span><input type="password" autocomplete="new-password" placeholder="Confirm new password"/></label>
-				<button class="btn-primary w-full" type="button">Reset password</button>
+				<button class="btn w-full" data-variant="primary" type="button">Reset password</button>
 			</form>
 		}
 }
@@ -78,7 +78,7 @@ templ VerifyEmailPage(data LoginPageData) {
 			<section class="form">
 				<div><h1>Verify email</h1><p>Confirm your email address to continue</p></div>
 				<div class="info-panel"><strong>Verification status</strong><span class="muted">Open this route with a token to wire the real confirmation flow.</span></div>
-				<a class="btn-primary w-full" href="/login">Back to sign in</a>
+				<a class="btn w-full" data-variant="primary" href="/login">Back to sign in</a>
 			</section>
 	}
 }

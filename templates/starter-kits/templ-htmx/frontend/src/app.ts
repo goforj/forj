@@ -4,6 +4,22 @@ import "./style.css"
 
 type Controller = (root: HTMLElement) => void
 type ThemePreference = "light" | "dark" | "system"
+type BootOptions = { force?: boolean }
+type BasecoatOptions = { force?: boolean }
+type BasecoatRuntime = { initAll: (options?: BasecoatOptions) => void }
+type BasecoatSidebar = HTMLElement & { toggle?: () => void }
+type BasecoatToastConfig = {
+  category: string
+  title: string
+  description: string
+}
+type BasecoatToaster = HTMLElement & { toast?: (config: BasecoatToastConfig) => HTMLElement }
+
+declare global {
+  interface Window {
+    basecoat?: BasecoatRuntime
+  }
+}
 
 const themeStorageKey = "theme"
 const sidebarCollapsedStorageKey = "sidebar-collapsed"
@@ -75,11 +91,11 @@ function setSidebarCollapsed(collapsed: boolean, persist = true) {
   }
 }
 
-function boot(root: ParentNode = document) {
+function boot(root: ParentNode = document, options: BootOptions = {}) {
   setupDocumentActions()
   root.querySelectorAll<HTMLElement>("[data-gf-controller]").forEach((element) => {
     const name = element.dataset.gfController
-    if (!name || element.dataset.gfControllerReady === "true") {
+    if (!name || (!options.force && element.dataset.gfControllerReady === "true")) {
       return
     }
     const controller = controllers[name]
@@ -171,11 +187,8 @@ function setupDocumentActions() {
 
 function toggleSidebar() {
   if (!window.matchMedia("(min-width: 768px)").matches) {
-    document.dispatchEvent(
-      new CustomEvent("basecoat:sidebar", {
-        detail: { id: "app-sidebar" },
-      }),
-    )
+    const sidebar = document.getElementById("app-sidebar") as BasecoatSidebar | null
+    sidebar?.toggle?.()
     return
   }
 
@@ -214,15 +227,12 @@ function closeClosestDialog(element: Element) {
 }
 
 function dispatchToast(trigger: HTMLElement) {
-  document.dispatchEvent(new CustomEvent("basecoat:toast", {
-    detail: {
-      config: {
-        category: trigger.dataset.gfToast || "info",
-        title: trigger.dataset.gfToastTitle || "Action complete",
-        description: trigger.dataset.gfToastDescription || "",
-      },
-    },
-  }))
+  const toaster = document.getElementById("toaster") as BasecoatToaster | null
+  toaster?.toast?.({
+    category: trigger.dataset.gfToast || "info",
+    title: trigger.dataset.gfToastTitle || "Action complete",
+    description: trigger.dataset.gfToastDescription || "",
+  })
 }
 
 function billingControlsController(root: HTMLElement) {
@@ -708,4 +718,9 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
     boot(event.target)
     restoreSidebar()
   }
+})
+document.body.addEventListener("htmx:historyRestore", () => {
+  window.basecoat?.initAll({ force: true })
+  boot(document, { force: true })
+  restoreSidebar()
 })
