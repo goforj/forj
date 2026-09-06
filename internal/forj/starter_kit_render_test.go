@@ -112,7 +112,7 @@ func TestScaffoldStarterKitPreservesExistingFrontendFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read Vue starter package: %v", err)
 	}
-	for _, expected := range []string{"@internationalized/date", "@lucide/vue", `"vite":`, `"zod": "^4.5.4"`} {
+	for _, expected := range []string{"@internationalized/date", "@lucide/vue", `"vite":`, `"vue-router": "^5.3.1"`, `"zod": "^4.5.4"`} {
 		if !strings.Contains(string(packageJSON), expected) {
 			t.Errorf("Vue starter package omitted %q:\n%s", expected, packageJSON)
 		}
