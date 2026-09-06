@@ -10,8 +10,41 @@ const frontendRoot = path.join(repositoryRoot, 'templates/starter-kits/vue/front
 const requireFromFrontend = createRequire(path.join(frontendRoot, 'package.json'))
 const viteEntry = requireFromFrontend.resolve('vite')
 const { build } = await import(pathToFileURL(viteEntry).href)
+const { createMemoryHistory, createRouter } = await import(pathToFileURL(requireFromFrontend.resolve('vue-router')).href)
 const { z } = await import(pathToFileURL(requireFromFrontend.resolve('zod')).href)
 const { zodRule } = await import(pathToFileURL(path.join(frontendRoot, 'src/lib/zod-rule.ts')).href)
+
+test('Vue Router preserves the starter navigation contracts', async () => {
+  const view = { template: '<div />' }
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'dashboard', component: view },
+      { path: '/login', name: 'login', component: view, meta: { publicShell: true } },
+      {
+        path: '/settings',
+        component: view,
+        children: [
+          { path: '', redirect: '/settings/profile' },
+          { path: 'profile', name: 'settings-profile', component: view },
+        ],
+      },
+      { path: '/:pathMatch(.*)*', name: 'not-found', component: view },
+    ],
+  })
+
+  await router.push('/settings')
+  await router.isReady()
+  assert.equal(router.currentRoute.value.fullPath, '/settings/profile')
+  assert.equal(router.currentRoute.value.name, 'settings-profile')
+
+  await router.push('/login')
+  assert.equal(router.currentRoute.value.meta.publicShell, true)
+
+  await router.push('/missing/nested')
+  assert.equal(router.currentRoute.value.name, 'not-found')
+  assert.deepEqual(router.currentRoute.value.params.pathMatch, ['missing', 'nested'])
+})
 
 test('Zod field rules preserve successful values and validation messages', () => {
   const rule = zodRule(z.string().min(3, { error: 'Enter at least three characters.' }))
