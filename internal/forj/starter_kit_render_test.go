@@ -416,7 +416,7 @@ func TestScaffoldTemplHTMXStarterKit(t *testing.T) {
 		config: &project.Config{
 			GoModuleName: "example.com/testapp",
 			Render: project.RenderConfig{
-				Components: project.Components{WebUI: true, WebAPI: true, Auth: true, DatabaseSQLite: true},
+				Components: project.Components{WebUI: true, WebAPI: true, Auth: true, OAuth: true, Metrics: true, DatabaseSQLite: true},
 				StarterKit: project.StarterKitTemplHTMX,
 			},
 		},
@@ -481,8 +481,21 @@ func TestScaffoldTemplHTMXStarterKit(t *testing.T) {
 			t.Fatalf("templ starter missing frontend styling marker %q", expected)
 		}
 	}
+	for _, expected := range []string{`"basecoat-css": "^1.0.2"`, `sidebar?.toggle?.()`, `toaster?.toast?.({`, `"htmx:historyRestore"`, `initAll({ force: true })`, `boot(document, { force: true })`} {
+		if !strings.Contains(string(packageJSON)+"\n"+string(frontendSource), expected) {
+			t.Fatalf("templ starter missing Basecoat 1 migration marker %q", expected)
+		}
+	}
+	for _, removed := range []string{`basecoat:sidebar`, `basecoat:toast`} {
+		if strings.Contains(string(frontendSource), removed) {
+			t.Fatalf("templ starter still uses removed Basecoat document event %q", removed)
+		}
+	}
 	if !strings.Contains(string(styleSource), `@source "../../../../internal/starterui/**/*.templ"`) {
 		t.Fatalf("templ style source must scan generated starter UI templates")
+	}
+	if !strings.Contains(string(styleSource), `@apply bg-background text-foreground antialiased;`) {
+		t.Fatal("templ style source must preserve application-owned font smoothing after Basecoat 1")
 	}
 
 	controllerSource, err := os.ReadFile(filepath.Join("internal", "starterui", "controller.go"))
@@ -524,9 +537,12 @@ func TestScaffoldTemplHTMXStarterKit(t *testing.T) {
 		`class="table"`,
 		`class="tabs"`,
 		`class="select w-full"`,
+		`class="combobox w-full"`,
+		`class="btn" data-variant="outline"`,
+		`class="badge" data-variant=`,
 		`class="popover"`,
 		`class="alert"`,
-		`class="alert-destructive"`,
+		`class="alert" data-variant="destructive"`,
 		`class="button-group"`,
 		`class="progress-track"`,
 		`class="chart-canvas"`,
@@ -543,6 +559,11 @@ func TestScaffoldTemplHTMXStarterKit(t *testing.T) {
 			t.Fatalf("templ starter surface missing %q", expected)
 		}
 	}
+	for _, removed := range []string{`class="btn-primary`, `class="btn-outline`, `class="badge-secondary`, `class="badge-outline`, `class="alert-destructive"`} {
+		if strings.Contains(templSurface, removed) {
+			t.Fatalf("templ starter still uses pre-1.0 Basecoat class %q", removed)
+		}
+	}
 
 	controllerTestText := string(controllerTestSource)
 	for _, expected := range []string{
@@ -555,6 +576,10 @@ func TestScaffoldTemplHTMXStarterKit(t *testing.T) {
 		`req.AddCookie(cookie)`,
 		`HX-Redirect`,
 		`auth.NewService`,
+		`auth.NewAuthIdentityRepo`,
+		`auth.NewOAuthStateRepo`,
+		`auth.NewOAuthProviders`,
+		`metrics.NewManager`,
 	} {
 		if !strings.Contains(controllerTestText, expected) {
 			t.Fatalf("templ starter controller tests missing auth integration marker %q", expected)

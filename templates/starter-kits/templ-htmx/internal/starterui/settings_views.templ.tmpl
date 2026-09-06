@@ -27,7 +27,7 @@ templ SettingsProfilePage(data PageData) {
 			<label class="field"><span>Name</span><input type="text" value={ data.User.Name } autocomplete="name"/></label>
 			<label class="field"><span>Email address</span><input value={ data.User.Email } type="email" autocomplete="username"/></label>
 			<p class="muted">Your email address is active for sign-in and notifications. Request verification after changing it.</p>
-			<button class="btn-primary" type="button">Save</button>
+			<button class="btn" data-variant="primary" type="button">Save</button>
 		</form>
 	}
 }
@@ -38,7 +38,7 @@ templ SettingsPasswordPage(data PageData) {
 			<label class="field"><span>Current password</span><input type="password" autocomplete="current-password"/></label>
 			<label class="field"><span>New password</span><input type="password" autocomplete="new-password"/></label>
 			<label class="field"><span>Confirm password</span><input type="password" autocomplete="new-password"/></label>
-			<button class="btn-primary" type="button">Save password</button>
+			<button class="btn" data-variant="primary" type="button">Save password</button>
 		</form>
 	}
 }

@@ -13,7 +13,7 @@ templ DataPage(data PageData) {
 				<div class="card" data-gf-controller="table">
 					<h2>Table variations</h2>
 					<p>Tables are low-level primitives, so this section shows several common product treatments in one place.</p>
-					<div class="table-tools"><input data-gf-table-filter type="search" placeholder="Search resources..."/><select data-gf-table-status><option value="all">All statuses</option><option value="ready">Ready</option><option value="draft">Draft</option><option value="blocked">Blocked</option></select><button class="btn-outline" type="button" data-gf-export-table="starter-resources">Export CSV</button></div>
+					<div class="table-tools"><input data-gf-table-filter type="search" placeholder="Search resources..."/><select data-gf-table-status><option value="all">All statuses</option><option value="ready">Ready</option><option value="draft">Draft</option><option value="blocked">Blocked</option></select><button class="btn" data-variant="outline" type="button" data-gf-export-table="starter-resources">Export CSV</button></div>
 					<div class="table-wrap">
 						<table class="table">
 							<thead><tr><th><button type="button" data-gf-table-sort="name">Resource</button></th><th>Status</th><th>Owner</th><th>Route</th><th>Updated</th></tr></thead>
@@ -28,10 +28,10 @@ templ DataPage(data PageData) {
 					</div>
 					<div class="demo-card">
 						<div class="inline-controls" style="justify-content:space-between"><strong>Pagination</strong><span class="muted">Page 3 of 10</span></div>
-						<div class="tag-row"><button class="btn-outline" type="button">Previous</button><button class="btn-primary" type="button">1</button><button class="btn-outline" type="button">2</button><button class="btn-outline" type="button">3</button><button class="btn-outline" type="button">Next</button></div>
+						<div class="tag-row"><button class="btn" data-variant="outline" type="button">Previous</button><button class="btn" data-variant="primary" type="button">1</button><button class="btn" data-variant="outline" type="button">2</button><button class="btn" data-variant="outline" type="button">3</button><button class="btn" data-variant="outline" type="button">Next</button></div>
 					</div>
 					<div class="demo-card">
-						<div class="inline-controls" style="justify-content:space-between"><div><strong>Audit log</strong><p>A dense event stream with subdued chrome and clear status emphasis.</p></div><span class="badge-outline">Realtime</span></div>
+						<div class="inline-controls" style="justify-content:space-between"><div><strong>Audit log</strong><p>A dense event stream with subdued chrome and clear status emphasis.</p></div><span class="badge" data-variant="outline">Realtime</span></div>
 						<div class="table-wrap">
 							<table class="table"><thead><tr><th>Event</th><th>Actor</th><th>Status</th><th>Time</th></tr></thead><tbody>
 								@auditRow("Starter rendered", "forj cli", "Success", "00:37:07")
@@ -41,7 +41,7 @@ templ DataPage(data PageData) {
 						</div>
 					</div>
 					<div class="demo-card">
-						<div class="inline-controls" style="justify-content:space-between"><div><strong>Invoice summary</strong><p>A financial table with stronger row separation and right-aligned values.</p></div><button class="btn-outline" type="button">Download all</button></div>
+						<div class="inline-controls" style="justify-content:space-between"><div><strong>Invoice summary</strong><p>A financial table with stronger row separation and right-aligned values.</p></div><button class="btn" data-variant="outline" type="button">Download all</button></div>
 						<div class="table-wrap">
 							<table class="table"><thead><tr><th>Invoice</th><th>Customer</th><th>State</th><th>Amount</th><th>Action</th></tr></thead><tbody>
 								@invoiceRow("INV-2048", "April 2026", "Acme Labs", "Paid", "$1,240.00")
@@ -57,7 +57,7 @@ templ DataPage(data PageData) {
 					<div class="demo-card"><strong>Single date</strong><input type="text" value="Jun 16, 2026" readonly/>@miniCalendar()</div>
 					<div class="demo-card"><strong>Date range</strong><div class="inline-controls"><input type="text" value="Apr 23, 2026" readonly/><input type="text" value="Apr 30, 2026" readonly/></div>@rangeCalendar()</div>
 					<div class="demo-card">
-						<div class="inline-controls" style="justify-content:space-between"><strong>Upcoming windows</strong><span class="badge-outline">3 scheduled</span></div>
+						<div class="inline-controls" style="justify-content:space-between"><strong>Upcoming windows</strong><span class="badge" data-variant="outline">3 scheduled</span></div>
 						<div class="item-list">
 							@releaseWindow("Starter kit polish", "UI audit and cleanup pass across components routes.", "Today", "Ready")
 							@releaseWindow("Auth route handoff", "Wire account pages to the generated auth service.", "Tomorrow", "Draft")
@@ -76,7 +76,7 @@ templ DataPage(data PageData) {
 								<h2>Dataset export completed</h2>
 								<section>The generated CSV is ready for review.</section>
 							</div>
-							<div class="alert-destructive">
+							<div class="alert" data-variant="destructive">
 								@iconArchive()
 								<h2>Sync stalled</h2>
 								<section>Metrics ingestion has not reported a checkpoint in 15 minutes.</section>
@@ -88,14 +88,14 @@ templ DataPage(data PageData) {
 								<div class="progress-track" aria-label="Template render progress"><div style="width: 66%"></div></div>
 								<div class="progress-track" aria-label="Asset build progress"><div style="width: 42%"></div></div>
 							</div>
-							<button class="btn-outline" type="button" disabled>@iconLoaderCircleSpin()<span>Building preview</span></button>
+							<button class="btn" data-variant="outline" type="button" disabled>@iconLoaderCircleSpin()<span>Building preview</span></button>
 						</div>
 					</div>
 					<div class="grid grid-2">
 						<div class="card">
 							<header><h2>Traffic by surface</h2><p>Canvas-based chart pattern with theme-aware colors.</p></header>
 							<section><canvas class="chart-canvas" width="520" height="220" aria-label="Traffic by surface chart" data-gf-chart></canvas></section>
-							<footer><span class="badge-secondary">@iconActivity()<span>Trending up 5.2%</span></span></footer>
+							<footer><span class="badge" data-variant="secondary">@iconActivity()<span>Trending up 5.2%</span></span></footer>
 						</div>
 						<div class="demo-card">
 							<strong>Release carousel</strong>
@@ -116,13 +116,13 @@ templ DataPage(data PageData) {
 								<h3 class="flex w-fit items-center gap-2 text-sm leading-snug font-medium">Security review</h3>
 								<p class="text-muted-foreground text-sm leading-normal">Credential rotation and session policy are ready for sign-off.</p>
 							</div>
-							<button class="btn-sm-outline" type="button">Review</button>
+							<button class="btn" data-size="sm" data-variant="outline" type="button">Review</button>
 						</article>
 						<div class="empty-box">
 							<span class="empty-icon">@iconDatabase()</span>
 							<strong>No imports queued</strong>
 							<p>Upload a dataset or connect a source when the workspace is ready.</p>
-							<button class="btn-sm-outline" type="button">@iconPlus()<span>Add source</span></button>
+							<button class="btn" data-size="sm" data-variant="outline" type="button">@iconPlus()<span>Add source</span></button>
 						</div>
 					</div>
 				</section>
@@ -134,20 +134,20 @@ templ DataPage(data PageData) {
 templ dataRow(name string, status string, owner string, route string, updated string) {
 		<tr data-gf-table-row data-gf-table-status={ statusKey(status) }>
 			<td data-gf-table-value="name">{ name }</td>
-			<td><span class={ statusClass(status) }>{ status }</span></td>
+			<td><span class="badge" data-variant={ statusVariant(status) }>{ status }</span></td>
 			<td>{ owner }</td>
 		<td><code>{ route }</code></td>
 			<td>{ updated }</td>
 		</tr>
 	}
 templ auditRow(event string, actor string, status string, time string) {
-		<tr><td>{ event }</td><td>{ actor }</td><td><span class={ statusClass(status) }>{ status }</span></td><td>{ time }</td></tr>
+		<tr><td>{ event }</td><td>{ actor }</td><td><span class="badge" data-variant={ statusVariant(status) }>{ status }</span></td><td>{ time }</td></tr>
 	}
 templ invoiceRow(number string, period string, customer string, state string, amount string) {
-		<tr><td><strong>{ number }</strong><br/><span class="muted">{ period }</span></td><td>{ customer }</td><td><span class={ statusClass(state) }>{ state }</span></td><td>{ amount }</td><td><button class="btn-outline" type="button">View</button></td></tr>
+		<tr><td><strong>{ number }</strong><br/><span class="muted">{ period }</span></td><td>{ customer }</td><td><span class="badge" data-variant={ statusVariant(state) }>{ state }</span></td><td>{ amount }</td><td><button class="btn" data-variant="outline" type="button">View</button></td></tr>
 	}
 templ releaseWindow(title string, description string, status string, classStatus string) {
-		<div class="item-row"><div><strong>{ title }</strong><p>{ description }</p></div><span class={ statusClass(classStatus) }>{ status }</span></div>
+		<div class="item-row"><div><strong>{ title }</strong><p>{ description }</p></div><span class="badge" data-variant={ statusVariant(classStatus) }>{ status }</span></div>
 	}
 templ miniCalendar() {
 		<div class="calendar-grid" aria-label="June 2026 calendar">

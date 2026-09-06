@@ -27,6 +27,9 @@ import (
 	"{{.GoModuleName}}/internal/caches"
 	"{{.GoModuleName}}/internal/database"
 	"{{.GoModuleName}}/internal/logger"
+{{- if .Components.Metrics }}
+	"{{.GoModuleName}}/internal/metrics"
+{{- end }}
 	"{{.GoModuleName}}/migrations"
 {{- end }}
 )
@@ -140,7 +143,10 @@ func newStarterUITestAuthFixture(t *testing.T) starterUITestAuthFixture {
 		t.Fatalf("load env: %v", err)
 	}
 
-	conns := database.NewConnections(nil)
+{{- if .Components.Metrics }}
+	metricsManager := metrics.NewManager()
+{{- end }}
+	conns := database.NewConnections({{- if .Components.Metrics }}metricsManager, {{- end }}nil)
 	t.Cleanup(func() {
 		_ = conns.Close(context.Background())
 	})
@@ -158,11 +164,19 @@ func newStarterUITestAuthFixture(t *testing.T) starterUITestAuthFixture {
 	service := auth.NewService(
 		auth.NewUserRepo(conns, sessionCache),
 		auth.NewAuthSessionRepo(conns, sessionCache),
+{{- if .Components.OAuth }}
+		auth.NewAuthIdentityRepo(conns),
+		auth.NewOAuthStateRepo(conns),
+		auth.NewOAuthProviders(),
+{{- end }}
 		auth.NewEmailVerificationRepo(conns),
 		auth.NewPasswordResetRepo(conns),
 		auth.NewLoginAttemptRepo(conns),
 		auth.NewLogDelivery(appLogger),
 		appLogger,
+{{- if .Components.Metrics }}
+		metricsManager,
+{{- end }}
 	)
 
 	login := str.Of(t.Name()).ToLower().ReplaceAll("/", "-").ReplaceAll(" ", "-").String() + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)

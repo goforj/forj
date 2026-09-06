@@ -6,7 +6,7 @@ templ ComponentsOverviewPage(data PageData) {
 			@hero("Local component reference", "Organized by workflow", "Review the local templ library as a set of focused reference pages.", "The reference is split into focused routes so teams can review one category at a time and lift patterns from realistic examples instead of a single oversized catalog.")
 			<section class="notice">
 				<span>These pages focus on local, product-shaped examples. For the full templ documentation and Basecoat component reference, see <a href="https://templ.guide/" target="_blank" rel="noreferrer">templ.guide</a> and <a href="https://basecoatui.com/" target="_blank" rel="noreferrer">basecoatui.com</a>.</span>
-				<a class="btn-outline" href="https://templ.guide/">
+				<a class="btn" data-variant="outline" href="https://templ.guide/">
 					<span>Open docs</span>
 					@iconArrowRight()
 				</a>
@@ -22,7 +22,7 @@ templ ComponentsOverviewPage(data PageData) {
 				<div class="card">
 					<h2>Surface primitives</h2>
 					<p>Reusable primitives still need a small landing area so teams understand the shell and theme language at a glance.</p>
-					<div class="badge-row"><span class="badge">Ready</span><span class="badge-secondary">Queued</span><span class="badge-outline">Draft</span><span class="badge-destructive">Blocked</span></div>
+					<div class="badge-row"><span class="badge">Ready</span><span class="badge" data-variant="secondary">Queued</span><span class="badge" data-variant="outline">Draft</span><span class="badge" data-variant="destructive">Blocked</span></div>
 					<div class="source-callout">
 						<span class="source-callout-icon">@iconCircleCheckBig()</span>
 						<div><strong>Everything here ships as local source</strong><p>The generated app owns these examples, so teams can adapt them directly instead of relying on a remote component catalog.</p></div>
@@ -32,7 +32,7 @@ templ ComponentsOverviewPage(data PageData) {
 						<div class="item-row">
 							<span class="item-icon">@iconLayers3()</span>
 							<div><strong>Application shell</strong><p>Sidebar, app header, auth bootstrap, and local UI source ship together as one coherent starting point.</p></div>
-							<button class="btn-secondary" type="button">Open</button>
+							<button class="btn" data-variant="secondary" type="button">Open</button>
 						</div>
 						<div class="item-row muted-row">
 							<span class="item-icon">@iconSparkles()</span>
@@ -45,8 +45,8 @@ templ ComponentsOverviewPage(data PageData) {
 						<p>Keep a few cross-cutting primitives visible here, then move the deeper walkthroughs into the focused child pages.</p>
 						<div class="badge-row">
 							<span class="badge">@iconLoaderCircleSpin()<span>Syncing</span></span>
-							<span class="badge-secondary">@iconLoaderCircleSpin()<span>Updating</span></span>
-							<span class="badge-outline">@iconLoaderCircleSpin()<span>Loading</span></span>
+							<span class="badge" data-variant="secondary">@iconLoaderCircleSpin()<span>Updating</span></span>
+							<span class="badge" data-variant="outline">@iconLoaderCircleSpin()<span>Loading</span></span>
 						</div>
 						<div class="skeleton">
 							<span style="width:50%"></span><span style="width:72%"></span><span style="width:62%"></span>
@@ -56,9 +56,9 @@ templ ComponentsOverviewPage(data PageData) {
 							<div class="avatar-stack" aria-hidden="true"><img src="https://github.com/shadcn.png" alt=""/><img src="https://github.com/maxleiter.png" alt=""/><img src="https://github.com/evilrabbit.png" alt=""/></div>
 							<strong>No team members added</strong>
 							<p>Invite collaborators when the workspace is ready for shared development.</p>
-							<button class="btn-primary" type="button">@iconPlus()<span>Invite collaborators</span></button>
+							<button class="btn" data-variant="primary" type="button">@iconPlus()<span>Invite collaborators</span></button>
 						</div>
-						<div class="empty-box"><span class="empty-icon">@iconLoaderCircleSpin()</span><strong>Processing request</strong><p>Please wait while we process your request. Do not refresh the page.</p><button class="btn-outline" type="button">Cancel</button></div>
+						<div class="empty-box"><span class="empty-icon">@iconLoaderCircleSpin()</span><strong>Processing request</strong><p>Please wait while we process your request. Do not refresh the page.</p><button class="btn" data-variant="outline" type="button">Cancel</button></div>
 					</div>
 				</div>
 			</div>
@@ -70,14 +70,14 @@ templ basecoatCoverage() {
 		<p>The starter kit tracks the local Basecoat catalog so generated examples stay aligned with the documented HTML contract.</p>
 		<div class="grid grid-4">
 			<div class="demo-card"><strong>Surfaces</strong><div class="component-token-list">@coverageToken("Accordion", "details.accordion")@coverageToken("Alert", ".alert")@coverageToken("Alert Dialog", "dialog.dialog")@coverageToken("Avatar", "img.rounded-full")@coverageToken("Badge", ".badge")@coverageToken("Breadcrumb", "ol")@coverageToken("Button", ".btn")@coverageToken("Button Group", ".button-group")@coverageToken("Card", ".card")@coverageToken("Dialog", "dialog.dialog")</div></div>
-			<div class="demo-card"><strong>Forms</strong><div class="component-token-list">@coverageToken("Checkbox", "input.input")@coverageToken("Combobox", ".select + header")@coverageToken("Field", ".field")@coverageToken("Form", ".form")@coverageToken("Input", ".input")@coverageToken("Input Group", "relative .input")@coverageToken("Label", ".label")@coverageToken("Radio Group", "fieldset")@coverageToken("Select", ".select")@coverageToken("Slider", "input[type=range].input")@coverageToken("Switch", "role=switch")@coverageToken("Textarea", ".textarea")</div></div>
+			<div class="demo-card"><strong>Forms</strong><div class="component-token-list">@coverageToken("Checkbox", "input.input")@coverageToken("Combobox", ".combobox")@coverageToken("Field", ".field")@coverageToken("Input", ".input")@coverageToken("Input Group", ".input-group")@coverageToken("Label", ".label")@coverageToken("Radio Group", "fieldset")@coverageToken("Select", ".select")@coverageToken("Slider", "input[type=range].input")@coverageToken("Switch", "role=switch")@coverageToken("Textarea", ".textarea")</div></div>
 			<div class="demo-card"><strong>Navigation</strong><div class="component-token-list">@coverageToken("Command", ".command")@coverageToken("Dropdown Menu", ".dropdown-menu")@coverageToken("Pagination", "nav[aria-label]")@coverageToken("Popover", ".popover")@coverageToken("Sidebar", ".sidebar")@coverageToken("Tabs", ".tabs")@coverageToken("Theme Switcher", "data-gf-theme-option")@coverageToken("Toast", ".toaster/.toast")@coverageToken("Tooltip", "data-tooltip")</div></div>
 			<div class="demo-card"><strong>Data States</strong><div class="component-token-list">@coverageToken("Carousel", ".slider")@coverageToken("Chart", "canvas")@coverageToken("Empty", "composed empty state")@coverageToken("Item", "article.group/item")@coverageToken("Kbd", ".kbd")@coverageToken("Progress", "progress bar")@coverageToken("Skeleton", "animate-pulse")@coverageToken("Spinner", "animate-spin")@coverageToken("Table", ".table")</div></div>
 		</div>
 	</section>
 }
 templ coverageToken(name string, selector string) {
-	<span class="badge-outline component-token"><span>{ name }</span><code>{ selector }</code></span>
+	<span class="badge component-token" data-variant="outline"><span>{ name }</span><code>{ selector }</code></span>
 }
 templ componentCard(title string, href string, description string, first string, second string, third string) {
 		<section class="card">
@@ -89,7 +89,7 @@ templ componentCard(title string, href string, description string, first string,
 				<li>{ third }</li>
 			</ul>
 			<form method="get" action={ href }>
-				<button class="btn-primary w-full" type="submit">
+				<button class="btn w-full" data-variant="primary" type="submit">
 					<span>Open { title }</span>
 					@iconArrowRight()
 				</button>

@@ -2,14 +2,14 @@ package starterui
 
 templ hero(badge string, badge2 string, title string, description string) {
 		<section class="hero-card">
-			<div class="badge-row"><span class="badge">{ badge }</span><span class="badge-outline">{ badge2 }</span></div>
+			<div class="badge-row"><span class="badge">{ badge }</span><span class="badge" data-variant="outline">{ badge2 }</span></div>
 			<h1>{ title }</h1>
 			<p>{ description }</p>
 		</section>
 	}
 templ heroMuted(badge string, badge2 string, title string, description string) {
 		<section class="hero-card">
-			<div class="badge-row"><span class="badge-secondary">{ badge }</span><span class="badge-outline">{ badge2 }</span></div>
+			<div class="badge-row"><span class="badge" data-variant="secondary">{ badge }</span><span class="badge" data-variant="outline">{ badge2 }</span></div>
 			<h1>{ title }</h1>
 			<p>{ description }</p>
 		</section>

@@ -33,7 +33,7 @@ templ FormsPage(data PageData) {
 								<label class="label gap-3 font-normal text-muted-foreground"><input class="input" type="checkbox" checked/> Same as shipping address</label>
 							</div>
 							<label class="field"><span>Order notes</span><textarea placeholder="Add any purchasing notes, PO references, or delivery requirements."></textarea></label>
-							<div class="inline-controls"><button class="btn-primary" type="button">Submit</button><button class="btn-outline" type="button">Cancel</button></div>
+							<div class="inline-controls"><button class="btn" data-variant="primary" type="button">Submit</button><button class="btn" data-variant="outline" type="button">Cancel</button></div>
 						</form>
 					</section>
 					<section class="card">
@@ -54,9 +54,9 @@ templ FormsPage(data PageData) {
 							</div>
 							<strong>Seat count</strong>
 							<div class="quantity-control" role="group" aria-label="Seat count">
-								<button class="btn-outline" type="button" aria-label="Decrease seats" data-gf-seat-decrement>-</button>
+								<button class="btn" data-variant="outline" type="button" aria-label="Decrease seats" data-gf-seat-decrement>-</button>
 								<input data-gf-seat-count aria-label="Seats" type="number" inputmode="numeric" min="1" max="25" value="8"/>
-								<button class="btn-outline" type="button" aria-label="Increase seats" data-gf-seat-increment>+</button>
+								<button class="btn" data-variant="outline" type="button" aria-label="Increase seats" data-gf-seat-increment>+</button>
 							</div>
 							<label class="form flex flex-row items-start gap-3 rounded-md border p-4 shadow-xs"><input class="input" data-gf-receipt-toggle type="checkbox" checked/><span>Email me receipts and renewal reminders</span></label>
 						</div>
@@ -76,7 +76,7 @@ templ FormsPage(data PageData) {
 							<div class="gf-input-group">
 								<span class="gf-input-addon">API</span>
 								<input type="text" value="token_live_4c4c..."/>
-								<span class="gf-input-addon gf-input-addon-end"><button class="btn-sm-outline" type="button">Copy</button></span>
+								<span class="gf-input-addon gf-input-addon-end"><button class="btn" data-size="sm" data-variant="outline" type="button">Copy</button></span>
 							</div>
 						</label>
 						<label class="field"><span>Starter profile</span><select class="select"><option>Vue + Shadcn-Vue</option><option>templ + Basecoat</option><option>React dashboard</option></select></label>
@@ -84,7 +84,7 @@ templ FormsPage(data PageData) {
 							<div class="field">
 								<span>Basecoat select</span>
 								<div class="select w-full" id="starter-runtime-select">
-									<button type="button" class="btn-outline w-full" id="starter-runtime-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="starter-runtime-select-listbox"><span class="truncate">Production</span>@iconChevronsUpDown()</button>
+									<button type="button" class="btn w-full" data-variant="outline" id="starter-runtime-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="starter-runtime-select-listbox"><span class="truncate">Production</span>@iconChevronsUpDown()</button>
 									<div id="starter-runtime-select-popover" data-popover aria-hidden="true">
 										<div role="listbox" id="starter-runtime-select-listbox" aria-orientation="vertical" aria-labelledby="starter-runtime-select-trigger">
 											<div role="option" data-value="local">Local</div>
@@ -97,11 +97,11 @@ templ FormsPage(data PageData) {
 							</div>
 							<div class="field">
 								<span>Basecoat combobox</span>
-								<div class="select w-full" id="starter-framework-combobox">
-									<button type="button" class="btn-outline w-full" id="starter-framework-combobox-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="starter-framework-combobox-listbox"><span class="truncate">templ</span>@iconChevronsUpDown()</button>
+								<div class="combobox w-full" id="starter-framework-combobox">
+									<input type="text" role="combobox" value="templ" placeholder="Search framework..." autocomplete="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" aria-expanded="false" aria-controls="starter-framework-combobox-listbox"/>
+									<span class="combobox-trigger-icon">@iconChevronsUpDown()</span>
 									<div id="starter-framework-combobox-popover" data-popover aria-hidden="true">
-										<header>@iconSearch()<input type="text" value="" placeholder="Search framework..." autocomplete="off" autocorrect="off" spellcheck="false" aria-autocomplete="list" role="combobox" aria-expanded="false" aria-controls="starter-framework-combobox-listbox" aria-labelledby="starter-framework-combobox-trigger"/></header>
-										<div role="listbox" id="starter-framework-combobox-listbox" aria-orientation="vertical" aria-labelledby="starter-framework-combobox-trigger" data-empty="No framework found.">
+										<div role="listbox" id="starter-framework-combobox-listbox" aria-orientation="vertical" data-empty="No framework found.">
 											<div role="option" data-value="vue">Vue</div>
 											<div role="option" data-value="react">React</div>
 											<div role="option" data-value="templ" aria-selected="true">templ</div>
@@ -118,25 +118,25 @@ templ FormsPage(data PageData) {
 							<label class="field"><span>Frontend stack</span><input type="text" list="frameworks" placeholder="Search framework..."/><datalist id="frameworks"><option>Vue</option><option>React</option><option>templ</option><option>Svelte</option></datalist></label>
 						</div>
 						<label class="field"><span>Summary</span><textarea placeholder="Describe the product screen you want to build next."></textarea></label>
-						<div class="inline-controls"><button class="btn-primary" type="button">Save settings</button><button class="btn-outline" type="button" data-gf-toast="success" data-gf-toast-title="Starter preview saved" data-gf-toast-description="This toast is rendered by the templ starter controller.">Preview toast</button></div>
+						<div class="inline-controls"><button class="btn" data-variant="primary" type="button">Save settings</button><button class="btn" data-variant="outline" type="button" data-gf-toast="success" data-gf-toast-title="Starter preview saved" data-gf-toast-description="This toast is rendered by the templ starter controller.">Preview toast</button></div>
 					</section>
 					<section class="card">
 						<h2>Input groups and assistant surfaces</h2>
 						<div class="grid grid-2">
 							<label class="field">
 								<span>Basecoat search input group</span>
-								<div class="bc-input-group with-left with-right">
-									<input type="text" class="input" placeholder="Search..."/>
-									<span class="bc-input-prefix">@iconSearch()</span>
-									<span class="bc-input-suffix bc-input-text">12 results</span>
+								<div class="input-group">
+									<span data-align="inline-start">@iconSearch()</span>
+									<input type="text" placeholder="Search..."/>
+									<span data-align="inline-end">12 results</span>
 								</div>
 							</label>
 							<label class="field">
 								<span>Basecoat URL input group</span>
-								<div class="bc-input-group url-input">
-									<input type="text" class="input" placeholder="example.com"/>
-									<span class="bc-input-prefix bc-input-text">https://</span>
-									<span class="bc-input-suffix" data-tooltip="Basecoat tooltip syntax uses data-tooltip.">@iconInfo()</span>
+								<div class="input-group">
+									<span data-align="inline-start">https://</span>
+									<input type="text" placeholder="example.com"/>
+									<span data-align="inline-end" data-tooltip="Basecoat tooltip syntax uses data-tooltip.">@iconInfo()</span>
 								</div>
 							</label>
 						</div>
@@ -162,7 +162,7 @@ templ FormsPage(data PageData) {
 								<div class="gf-input-group">
 									<span class="gf-input-addon">https://</span>
 									<input type="url" placeholder="example.com"/>
-									<span class="gf-input-addon gf-input-addon-end"><button class="btn-sm-icon-ghost" type="button" aria-label="URL information">@iconInfo()</button></span>
+									<span class="gf-input-addon gf-input-addon-end"><button class="btn" data-size="icon-sm" data-variant="ghost" type="button" aria-label="URL information">@iconInfo()</button></span>
 								</div>
 							</label>
 						</div>
@@ -171,10 +171,10 @@ templ FormsPage(data PageData) {
 							<div class="gf-input-group gf-input-group-stack">
 								<textarea placeholder="Ask, Search or Chat..."></textarea>
 								<footer role="group" class="gf-input-toolbar gf-input-toolbar-bottom">
-									<button class="btn-icon-outline" type="button" aria-label="Add attachment">@iconPlus()</button>
-									<button class="btn-sm-ghost" type="button">Auto</button>
+									<button class="btn" data-size="icon" data-variant="outline" type="button" aria-label="Add attachment">@iconPlus()</button>
+									<button class="btn" data-size="sm" data-variant="ghost" type="button">Auto</button>
 									<span class="gf-input-addon gf-input-toolbar-spacer">52% used</span>
-									<button class="btn-icon-primary" type="button" disabled aria-label="Send message">@iconArrowUp()</button>
+									<button class="btn" data-size="icon" data-variant="primary" type="button" disabled aria-label="Send message">@iconArrowUp()</button>
 								</footer>
 							</div>
 						</label>
@@ -185,17 +185,17 @@ templ FormsPage(data PageData) {
 							</div>
 							<div class="gf-input-group gf-input-group-stack">
 								<header role="group" class="gf-input-toolbar gf-input-toolbar-top">
-									<button class="btn-sm-outline" type="button">Add context</button>
-									<span class="badge-outline">frontend</span>
-									<span class="badge-outline">billing</span>
-									<span class="badge-outline">starter-kit</span>
+									<button class="btn" data-size="sm" data-variant="outline" type="button">Add context</button>
+									<span class="badge" data-variant="outline">frontend</span>
+									<span class="badge" data-variant="outline">billing</span>
+									<span class="badge" data-variant="outline">starter-kit</span>
 								</header>
 								<textarea placeholder="Describe what the assistant should investigate, change, or summarize."></textarea>
 								<footer role="group" class="gf-input-toolbar gf-input-toolbar-bottom">
-									<button class="btn-sm-ghost" type="button">Auto</button>
-									<button class="btn-sm-ghost" type="button">All sources</button>
+									<button class="btn" data-size="sm" data-variant="ghost" type="button">Auto</button>
+									<button class="btn" data-size="sm" data-variant="ghost" type="button">All sources</button>
 									<span class="gf-input-addon gf-input-toolbar-spacer">Draft response mode</span>
-									<button class="btn-icon-primary" type="button" aria-label="Send handoff">@iconArrowUp()</button>
+									<button class="btn" data-size="icon" data-variant="primary" type="button" aria-label="Send handoff">@iconArrowUp()</button>
 								</footer>
 							</div>
 						</div>
@@ -205,7 +205,7 @@ templ FormsPage(data PageData) {
 								<div class="gf-input-group">
 									<span class="gf-input-addon">POST</span>
 									<input type="text" placeholder="/api/v1/webhooks/stripe"/>
-									<span class="gf-input-addon gf-input-addon-end"><button class="btn-sm-outline" type="button">Copy</button></span>
+									<span class="gf-input-addon gf-input-addon-end"><button class="btn" data-size="sm" data-variant="outline" type="button">Copy</button></span>
 								</div>
 							</label>
 							<label class="field">
@@ -220,7 +220,7 @@ templ FormsPage(data PageData) {
 					<section class="card">
 						<h2>Identity and access verification</h2>
 						<div class="item-list">
-							<div class="item-row"><div><strong>Two-factor authentication</strong><p>Verify via email or phone number.</p></div><button class="btn-primary" type="button">Enable</button></div>
+							<div class="item-row"><div><strong>Two-factor authentication</strong><p>Verify via email or phone number.</p></div><button class="btn" data-variant="primary" type="button">Enable</button></div>
 							<div class="item-row">
 								<span class="item-icon">@iconBadgeCheck()</span>
 								<strong>Your profile has been verified.</strong>
@@ -228,7 +228,7 @@ templ FormsPage(data PageData) {
 							</div>
 						</div>
 						<div class="demo-card" data-gf-controller="otp">
-							<label class="field"><span>Invite tags</span><div class="tag-row"><span class="badge-outline">frontend</span><span class="badge-outline">platform</span><input type="text" placeholder="Add tag..."/></div></label>
+							<label class="field"><span>Invite tags</span><div class="tag-row"><span class="badge" data-variant="outline">frontend</span><span class="badge" data-variant="outline">platform</span><input type="text" placeholder="Add tag..."/></div></label>
 							<label class="field"><span>Email verification</span><div class="otp-row" role="group" aria-label="Email verification code">@otpInput("verification-code", "4", "Email verification digit 1")@otpInput("verification-code", "2", "Email verification digit 2")@otpInput("verification-code", "8", "Email verification digit 3")@otpInput("verification-code", "9", "Email verification digit 4")@otpInput("verification-code", "1", "Email verification digit 5")@otpInput("verification-code", "6", "Email verification digit 6")</div></label>
 							<label class="field"><span>Backup PIN</span><div class="otp-row" role="group" aria-label="Backup PIN">@otpInput("backup-pin", "2", "Backup PIN digit 1")@otpInput("backup-pin", "4", "Backup PIN digit 2")@otpInput("backup-pin", "7", "Backup PIN digit 3")@otpInput("backup-pin", "1", "Backup PIN digit 4")</div></label>
 						</div>
@@ -252,7 +252,7 @@ templ FormsPage(data PageData) {
 							<strong>Session and device controls</strong>
 							<label class="label gap-3 font-normal text-muted-foreground"><input class="input" type="checkbox" checked/> Require device approval</label>
 							<label class="label gap-3 font-normal text-muted-foreground"><input class="input" type="checkbox"/> Session timeout after 30 minutes</label>
-							<div class="item-row"><div><strong>MacBook Pro - San Francisco</strong><p>Last active 2 minutes ago on Chrome 136.</p></div><button class="btn-outline" type="button">Revoke</button></div>
+							<div class="item-row"><div><strong>MacBook Pro - San Francisco</strong><p>Last active 2 minutes ago on Chrome 136.</p></div><button class="btn" data-variant="outline" type="button">Revoke</button></div>
 						</div>
 					</section>
 					<section class="card">

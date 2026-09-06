@@ -12,17 +12,17 @@ templ NavigationPage(data PageData) {
 							<div class="demo-card">
 								<strong>Message actions</strong>
 								<div class="toolbar-row">
-									<div role="group" class="button-group"><button class="btn-outline" type="button" aria-label="Go back">@iconArrowLeft()</button></div>
-									<div class="inline-controls"><div role="group" class="button-group"><button class="btn-outline" type="button">Archive</button><button class="btn-outline" type="button">Report</button></div><div role="group" class="button-group"><button class="btn-outline" type="button">Snooze</button><button class="btn-outline" type="button" aria-label="More options">...</button></div></div>
+									<div role="group" class="button-group"><button class="btn" data-variant="outline" type="button" aria-label="Go back">@iconArrowLeft()</button></div>
+									<div class="inline-controls"><div role="group" class="button-group"><button class="btn" data-variant="outline" type="button">Archive</button><button class="btn" data-variant="outline" type="button">Report</button></div><div role="group" class="button-group"><button class="btn" data-variant="outline" type="button">Snooze</button><button class="btn" data-variant="outline" type="button" aria-label="More options">...</button></div></div>
 								</div>
 							</div>
 							<div class="demo-card">
 								<strong>Pagination tools</strong>
 								<div class="toolbar-row">
-									<div role="group" class="button-group"><button class="btn-outline" type="button">1</button><button class="btn-outline" type="button">2</button><button class="btn-outline" type="button">3</button></div>
+									<div role="group" class="button-group"><button class="btn" data-variant="outline" type="button">1</button><button class="btn" data-variant="outline" type="button">2</button><button class="btn" data-variant="outline" type="button">3</button></div>
 									<div class="inline-controls">
-										<div role="group" class="button-group"><button class="btn-outline" type="button" aria-label="Previous page">@iconArrowLeft()</button><button class="btn-outline" type="button" aria-label="Next page">@iconArrowRight()</button></div>
-										<button class="btn-outline" type="button">@iconBot()<span>Copilot</span></button>
+										<div role="group" class="button-group"><button class="btn" data-variant="outline" type="button" aria-label="Previous page">@iconArrowLeft()</button><button class="btn" data-variant="outline" type="button" aria-label="Next page">@iconArrowRight()</button></div>
+										<button class="btn" data-variant="outline" type="button">@iconBot()<span>Copilot</span></button>
 									</div>
 								</div>
 							</div>
@@ -37,7 +37,7 @@ templ NavigationPage(data PageData) {
 						<p>Dropdowns, context menus, and disclosures should feel like product tools, not isolated demos.</p>
 						<div class="inline-controls" data-gf-controller="menu">
 							<div id="starter-project-actions" class="dropdown-menu">
-								<button type="button" id="starter-project-actions-trigger" aria-haspopup="menu" aria-controls="starter-project-actions-menu" aria-expanded="false" class="btn-outline"><span>Project actions</span>@iconChevronsUpDown()</button>
+								<button type="button" id="starter-project-actions-trigger" aria-haspopup="menu" aria-controls="starter-project-actions-menu" aria-expanded="false" class="btn" data-variant="outline"><span>Project actions</span>@iconChevronsUpDown()</button>
 								<div id="starter-project-actions-popover" data-popover aria-hidden="true" class="min-w-56">
 									<div role="menu" id="starter-project-actions-menu" aria-labelledby="starter-project-actions-trigger">
 										<div role="group" aria-labelledby="starter-project-heading">
@@ -61,7 +61,7 @@ templ NavigationPage(data PageData) {
 								</div>
 							</div>
 							<div id="starter-launch-date" class="dropdown-menu">
-								<button type="button" id="starter-launch-date-trigger" aria-haspopup="menu" aria-controls="starter-launch-date-menu" aria-expanded="false" class="btn-outline"><span>Pick launch date</span>@iconCalendar()</button>
+								<button type="button" id="starter-launch-date-trigger" aria-haspopup="menu" aria-controls="starter-launch-date-menu" aria-expanded="false" class="btn" data-variant="outline"><span>Pick launch date</span>@iconCalendar()</button>
 								<div id="starter-launch-date-popover" data-popover aria-hidden="true" class="w-72">
 									<div role="menu" id="starter-launch-date-menu" aria-labelledby="starter-launch-date-trigger">@miniCalendar()</div>
 								</div>
@@ -77,7 +77,7 @@ templ NavigationPage(data PageData) {
 							</div>
 						</div>
 						<div class="demo-card">
-							<div class="inline-controls" style="justify-content:space-between"><div><strong>Need a smaller disclosure?</strong><p>Use a collapsible block when one hidden section is enough.</p></div><button class="btn-outline" type="button">Toggle</button></div>
+							<div class="inline-controls" style="justify-content:space-between"><div><strong>Need a smaller disclosure?</strong><p>Use a collapsible block when one hidden section is enough.</p></div><button class="btn" data-variant="outline" type="button">Toggle</button></div>
 							<p class="muted">This pattern works well for advanced settings, environment details, or inline help that should stay secondary to the main workflow.</p>
 						</div>
 						<section class="accordion demo-card">
@@ -140,12 +140,12 @@ templ NavigationPage(data PageData) {
 					</div>
 					<nav role="navigation" aria-label="pagination" class="mx-auto flex w-full justify-center">
 						<ul class="flex flex-row items-center gap-1">
-							<li><a href="#" class="btn-ghost">@iconArrowLeft()<span>Previous</span></a></li>
-							<li><a href="#" class="btn-icon-ghost">1</a></li>
-							<li><a href="#" class="btn-icon-outline">2</a></li>
-							<li><a href="#" class="btn-icon-ghost">3</a></li>
+							<li><a href="#" class="btn" data-variant="ghost">@iconArrowLeft()<span>Previous</span></a></li>
+							<li><a href="#" class="btn" data-size="icon" data-variant="ghost">1</a></li>
+							<li><a href="#" class="btn" data-size="icon" data-variant="outline">2</a></li>
+							<li><a href="#" class="btn" data-size="icon" data-variant="ghost">3</a></li>
 							<li><div class="size-9 flex items-center justify-center">...</div></li>
-							<li><a href="#" class="btn-ghost"><span>Next</span>@iconArrowRight()</a></li>
+							<li><a href="#" class="btn" data-variant="ghost"><span>Next</span>@iconArrowRight()</a></li>
 						</ul>
 					</nav>
 				</section>

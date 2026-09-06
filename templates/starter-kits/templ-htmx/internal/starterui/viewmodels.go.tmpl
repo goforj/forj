@@ -51,14 +51,15 @@ func userInitials(name string) string {
 	return "GF"
 }
 
-func statusClass(status string) string {
+// statusVariant keeps status semantics independent from Basecoat's canonical badge class.
+func statusVariant(status string) string {
 	switch status {
 	case "Blocked", "Overdue", "Unauthorized":
-		return "badge-destructive"
+		return "destructive"
 	case "Draft", "Pending", "Queued", "Tomorrow":
-		return "badge-secondary"
+		return "secondary"
 	default:
-		return "badge"
+		return "primary"
 	}
 }
 
