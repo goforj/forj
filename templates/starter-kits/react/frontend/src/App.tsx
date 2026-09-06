@@ -12,7 +12,7 @@ import {
   ClipboardList,
   Command as CommandIcon,
   Database,
-  Github,
+  GitFork,
   KeyRound,
   Layers3,
   LayoutDashboard,
@@ -509,7 +509,7 @@ function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Repository">
                   <a href="https://github.com/goforj/goforj" target="_blank" rel="noreferrer" aria-label="Repository" onClick={closeMobile}>
-                    <Github />
+                    <GitFork />
                     <span>Repository</span>
                   </a>
                 </SidebarMenuButton>
