@@ -92,6 +92,41 @@ func TestPrimitiveTemplateProjection(t *testing.T) {
 	t.Run("dashboard conditionals", testPrimitiveDashboardProjection)
 }
 
+// TestMariaDBTwelveContainerContract keeps generated databases on the reviewed image and safe persisted-volume upgrade path.
+func TestMariaDBTwelveContainerContract(t *testing.T) {
+	dockerfile, err := templatesFS.ReadFile("containers/mariadb/Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "FROM mariadb:12.3.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979"; !strings.Contains(string(dockerfile), want) {
+		t.Fatalf("MariaDB Dockerfile missing %q\n%s", want, dockerfile)
+	}
+
+	compose, err := templatesFS.ReadFile("docker-compose.yml.tmpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"MARIADB_AUTO_UPGRADE=1",
+		`test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]`,
+	} {
+		if !strings.Contains(string(compose), want) {
+			t.Fatalf("MariaDB Compose template missing %q", want)
+		}
+	}
+
+	config, err := templatesFS.ReadFile("containers/mariadb/my.cnf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(config), "\nkey_buffer           =") {
+		t.Fatalf("MariaDB config retains ambiguous key_buffer prefix\n%s", config)
+	}
+	if !strings.Contains(string(config), "key_buffer_size") {
+		t.Fatalf("MariaDB config missing key_buffer_size\n%s", config)
+	}
+}
+
 // TestSharedMetricsFollowProjectAndAppProjection verifies named-App-only capabilities still compile while runtime flags remain App-local.
 func TestSharedMetricsFollowProjectAndAppProjection(t *testing.T) {
 	workspace := currentProjectRenderWorkspace(t)
