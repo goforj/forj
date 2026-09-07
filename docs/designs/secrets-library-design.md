@@ -29,7 +29,7 @@ The root library should be byte-preserving, read-focused, safe to format acciden
 
 The initial supported sources should be memory/fake, a mounted-file source compatible with ordinary files, Docker secrets, and Kubernetes Secret volumes, AWS Secrets Manager, Google Cloud Secret Manager, Azure Key Vault Secrets, and HashiCorp Vault KV v2. Every production driver should have a conformance suite and real-service integration coverage. An emulator or SDK mock may supplement that coverage, but does not establish provider compatibility by itself.
 
-Environment-delivered secrets are a separate concern owned by `github.com/goforj/env/v2/envsecrets`. They are captured during application configuration and are not a Secrets driver. Applications choose environment capture or runtime provider retrieval in composition through narrow domain interfaces; neither package imports or adapts the other.
+Environment-delivered secrets are a separate concern owned by `github.com/goforj/env/v2/envsecrets`. They are read during application configuration and are not a Secrets driver. Applications choose environment reads or runtime provider retrieval in composition through narrow domain interfaces; neither package imports or adapts the other.
 
 ## Decision
 
@@ -659,9 +659,9 @@ Generated `.env.example` and `.env.testing` continue to follow the existing envi
 
 ## Relationship To Environment Secrets
 
-`github.com/goforj/env/v2/envsecrets` captures explicitly declared environment variables during application configuration. It is not a source driver for this library. Process environment delivery lacks provider versions, per-read authorization, retry semantics, remote freshness, and the lifecycle expected by the driver contract.
+`github.com/goforj/env/v2/envsecrets` reads explicitly named environment variables during application configuration. It is not a source driver for this library. Process environment delivery lacks provider versions, per-read authorization, retry semantics, remote freshness, and the lifecycle expected by the driver contract.
 
-Applications that can use either delivery mechanism define a narrow domain interface and select one implementation in application composition. An environment-backed implementation reads a captured `envsecrets.Value`; a managed implementation reads this library's `Reader`. GoForj does not translate between them, share keys between them, or fall back from one to the other. General Secrets tests use the memory source and fake rather than process environment variables.
+Applications that can use either delivery mechanism define a narrow domain interface and select one implementation in application composition. An environment-backed implementation retains an `envsecrets.Value` read during composition; a managed implementation reads this library's `Reader`. GoForj does not translate between them, share keys between them, or fall back from one to the other. General Secrets tests use the memory source and fake rather than process environment variables.
 
 ## Testkit And Fakes
 
