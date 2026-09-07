@@ -14,12 +14,12 @@
 GoForj should add a small, domain-neutral Secrets library and an optional generated Secrets component. Application code should request a logical key and receive an opaque value without knowing an AWS ARN, Vault mount, Kubernetes volume path, or provider SDK type:
 
 ```go
-secret, err := app.Secrets().Get(ctx, secrets.Key("database.primary.password"))
+secret, err := app.Secrets().Get(ctx, "database.primary.password")
 if err != nil {
 	return err
 }
 
-password, err := secret.Value().Text()
+password, err := secret.Text()
 if err != nil {
 	return err
 }
@@ -234,15 +234,13 @@ The exact names may change during implementation, but the capability surface sho
 ```go
 package secrets
 
-type Key string
-
 type Reader interface {
-	Get(ctx context.Context, key Key, options ...GetOption) (Secret, error)
+	Get(ctx context.Context, key string, options ...GetOption) (Secret, error)
 }
 
 type Client interface {
 	Reader
-	Invalidate(ctx context.Context, key Key) error
+	Invalidate(ctx context.Context, key string) error
 	Close(ctx context.Context) error
 }
 
@@ -254,29 +252,18 @@ type Secret struct {
 	// unexported
 }
 
-func (s Secret) Value() Value
 func (s Secret) Metadata() Metadata
+func (s Secret) Bytes() ([]byte, error)
+func (s Secret) Text() (string, error)
+func (s Secret) Len() int
 func (s Secret) String() string
 func (s Secret) GoString() string
 func (s Secret) Format(fmt.State, rune)
 func (s Secret) MarshalText() ([]byte, error)
 func (s Secret) MarshalJSON() ([]byte, error)
 
-type Value struct {
-	// unexported
-}
-
-func (v Value) Bytes() ([]byte, error)
-func (v Value) Text() (string, error)
-func (v Value) Len() int
-func (v Value) String() string
-func (v Value) GoString() string
-func (v Value) Format(fmt.State, rune)
-func (v Value) MarshalText() ([]byte, error)
-func (v Value) MarshalJSON() ([]byte, error)
-
 type Metadata struct {
-	Key       Key
+	Key       string
 	Revision  Revision
 	FetchedAt time.Time
 	Stale     bool
@@ -295,9 +282,9 @@ func (r Revision) MarshalText() ([]byte, error)
 func (r Revision) MarshalJSON() ([]byte, error)
 ```
 
-`Get(ctx, key)` means current. Options are mutually exclusive; more than one selector returns `ErrInvalid`. Constructors reject empty exact versions, invalid aliases, excessive lengths, and control characters before routing. The public reader has no locator-bearing overload.
+`Get(ctx, key)` means current. Get and Invalidate accept ordinary strings because a dedicated string wrapper would not validate an inline conversion or prevent an invalid key. Both operations validate key grammar, length, and exact catalog membership before routing. Options are mutually exclusive; more than one selector returns `ErrInvalid`. Exact and Alias remain constructors because they validate different selector contracts. The public reader has no locator-bearing overload.
 
-`Value.String`, `Value.GoString`, JSON marshaling, text marshaling, and structured logging integration emit a constant such as `[REDACTED]`. `Secret` marshals only that same marker, not even its otherwise-safe metadata, so serialization cannot become a second inventory surface. Every concrete object reachable through a public API that retains a payload, locator, credential, or arbitrary injected failure implements safe `String`, `GoString`, `fmt.Formatter`, text marshaling, and JSON marshaling. This includes Secret, Value, clients, snapshots, bound sources returned behind interfaces, driver configuration values, memory sources, fakes, and mutation controllers. The rule covers values, pointers, every formatting verb, and nesting inside another formatted struct. Generated App container formatting must not traverse secret-retaining internals. Invalid zero `Secret` and `Value` values still redact under every formatting and marshaling path; disclosure accessors return `ErrInvalid`. Explicit accessor fields on trusted construction configuration remain readable to the code that owns them, but generic formatting and serialization redact locators. `Value.Bytes` returns a fresh copy. `Value.Text` returns a new string only for valid UTF-8 and otherwise returns `ErrNotText`. Neither accessor removes whitespace, trailing newlines, or NUL bytes. Destination-specific code decides whether those bytes are acceptable.
+`Secret.String`, `Secret.GoString`, JSON marshaling, text marshaling, and structured logging integration emit a constant such as `[REDACTED]`, not even otherwise-safe metadata, so serialization cannot become a second inventory surface. Every concrete object reachable through a public API that retains a payload, locator, credential, or arbitrary injected failure implements safe `String`, `GoString`, `fmt.Formatter`, text marshaling, and JSON marshaling. This includes Secret, clients, snapshots, bound sources returned behind interfaces, driver configuration values, memory sources, fakes, and mutation controllers. The rule covers values, pointers, every formatting verb, and nesting inside another formatted struct. Generated App container formatting must not traverse secret-retaining internals. An invalid zero `Secret` still redacts under every formatting and marshaling path; disclosure accessors return `ErrInvalid`. Explicit accessor fields on trusted construction configuration remain readable to the code that owns them, but generic formatting and serialization redact locators. `Secret.Bytes` returns a fresh copy. `Secret.Text` returns a new string only for valid UTF-8 and otherwise returns `ErrNotText`. Neither accessor removes whitespace, trailing newlines, or NUL bytes. Destination-specific code decides whether those bytes are acceptable.
 
 `Revision.Equal` compares a length-delimited internal identity domain containing driver kind, source instance, logical binding, App and tenant scope, and the resolved concrete provider revision. Once a movable selector resolves, the request form is not part of equality: current, alias, and exact requests that resolve to the same concrete provider revision compare equal within the same binding and scope. Identical provider version strings such as `1` across keys, sources, Apps, or tenants are still unequal. Every Revision formatting and marshaling path exposes only a process-keyed safe digest of that domain, including when nested in Metadata. Revisions are equality tokens, not sortable sequence numbers, and equality is guaranteed only within the process lifetime unless a future persisted-revision contract says otherwise.
 
@@ -648,7 +635,7 @@ Driver-specific settings should be typed YAML structures with strict unknown-fie
 ```go
 package secretkeys
 
-const DatabasePrimaryPassword secrets.Key = "database.primary.password"
+const DatabasePrimaryPassword = "database.primary.password"
 ```
 
 Locator metadata is not a secret payload or credential, but it can reveal account structure, project names, vault layout, and application architecture. Each locator field therefore supports exactly one trusted source: an inline value for operators who intentionally permit it in their repository, or a named deployment-configuration reference resolved by generated GoForj wiring at startup. Public templates and `.env.example` contain only blank locator placeholders. Generated plans, logs, readiness, Lighthouse, metrics, and errors show binding counts and safe source names, never locator values. Repositories that commit inline locators must apply their normal access policy and secret scanning; the word "non-secret" is not used to imply unrestricted diagnostic safety.
@@ -780,7 +767,7 @@ Implement AWS, Google, Azure, and Vault in independent modules. For each driver,
 
 ### Phase 4: GoForj integration
 
-Add the optional component, strict generated config, typed key constants, App and tenant-scoped readers, startup/readiness, metrics, Lighthouse, Testkit, shutdown, multi-App coverage, and component-off parity. Update every module pin and render the maximum composition outside the repository directory.
+Add the optional component, strict generated config, logical-key constants, App and tenant-scoped readers, startup/readiness, metrics, Lighthouse, Testkit, shutdown, multi-App coverage, and component-off parity. Update every module pin and render the maximum composition outside the repository directory.
 
 ### Phase 5: Rotation consumers
 
