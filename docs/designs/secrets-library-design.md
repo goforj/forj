@@ -4,7 +4,7 @@
 
 - Design status: proposed
 - Planning date: 2026-09-06
-- Target repositories: a new `github.com/goforj/secrets` sibling repository, independent driver modules, an optional environment adapter module, and `goforj`
+- Target repositories: a new `github.com/goforj/secrets` sibling repository, independent provider driver modules, and `goforj`
 - Primary sibling-library scope: logical secret reads, redacting values, version selection, safe caching, lifecycle, observations, and test support
 - Primary GoForj scope: an optional Secrets component, generated source and binding configuration, App and tenant scoping, readiness, Testkit integration, and render coverage
 - Cross-repository source of truth: this design is normative until the Secrets repository contains an accepted design or implementation plan that references it
@@ -29,7 +29,7 @@ The root library should be byte-preserving, read-focused, safe to format acciden
 
 The initial supported sources should be memory/fake, a mounted-file source compatible with ordinary files, Docker secrets, and Kubernetes Secret volumes, AWS Secrets Manager, Google Cloud Secret Manager, Azure Key Vault Secrets, and HashiCorp Vault KV v2. Every production driver should have a conformance suite and real-service integration coverage. An emulator or SDK mock may supplement that coverage, but does not establish provider compatibility by itself.
 
-Environment variables are a separate concern. The companion `github.com/goforj/envsecrets` design owns bounded process-environment lookup and explicitly does not own dotenv loading. An independent driver module may combine `envsecrets` and `secrets`, but neither root module may import the other.
+Environment-delivered secrets are a separate concern owned by `github.com/goforj/env/v2/envsecrets`. They are captured during application configuration and are not a Secrets driver. Applications choose environment capture or runtime provider retrieval in composition through narrow domain interfaces; neither package imports or adapts the other.
 
 ## Decision
 
@@ -92,7 +92,7 @@ Adopt these decisions:
 53. Generated configuration never contains payloads, cloud private keys, Vault tokens, or AppRole SecretIDs. Provider locators are separately classified sensitive operational metadata and follow the explicit inline-versus-deployment-reference policy below.
 54. Runtime configuration can select only drivers compiled into the application. It cannot load arbitrary plugins or accept arbitrary provider endpoints from request data.
 55. Provider driver releases require capability-parameterized root conformance tests plus live or real-server integration coverage described in this design.
-56. An optional `envsecrets` adapter is an independent module importing both roots. Neither `github.com/goforj/secrets` nor `github.com/goforj/envsecrets` imports the other.
+56. Environment-delivered secrets remain outside this driver model. The library does not provide an environment driver, precedence chain, or fallback into process environment variables.
 
 ## Why A Separate Library
 
@@ -184,7 +184,7 @@ A previously successful cached result returned after its freshness TTL because a
 - package documentation and executable examples; and
 - compatibility tests that driver modules can import.
 
-The root module must not depend on GoForj, cloud SDKs, Vault SDKs, Kubernetes clients, Docker clients, or `envsecrets`.
+The root module must not depend on GoForj, cloud SDKs, Vault SDKs, Kubernetes clients, Docker clients, or `env/v2/envsecrets`.
 
 ### Independent driver modules
 
@@ -197,7 +197,6 @@ github.com/goforj/secrets/driver/awssecretsmanager
 github.com/goforj/secrets/driver/gcpsecretmanager
 github.com/goforj/secrets/driver/azurekeyvault
 github.com/goforj/secrets/driver/vaultkv2
-github.com/goforj/secrets/driver/envsecrets
 ```
 
 The memory implementation remains in the root because it has no external dependency and defines reference behavior. The file module can remain independent to permit operating-system-specific containment implementations without expanding the root surface.
@@ -343,7 +342,7 @@ Each driver exposes typed locator configuration and a `Bind` constructor that va
 
 `NewSourceError` is the only driver-facing failure constructor. It accepts no message, cause, key, source name, locator, or provider object. It validates the closed kind, permits `MayRetry` only for unavailable and rate-limited failures, bounds nonzero retry-after, and returns an immutable safely formatted error recognized by the root. Context cancellation and deadline errors caused by the supplied context are returned directly. A driver maps and consumes its SDK error internally, then returns a SourceError without wrapping that SDK value; an unknown provider failure becomes non-retryable `SourceInvalidResponse`. The root adds only its already-validated logical key and safe source name while preserving sentinel and closed-kind behavior. External-driver conformance tests compile outside the root package and verify every constructor branch, retry decision, formatting verb, unwrap chain, and provider-error non-retention.
 
-Memory, mounted file, AWS, Google, and the environment bridge declare `PayloadBytes`. Azure and Vault KV v2 string fields declare `PayloadUTF8`. AWS is byte-capable for every binding because different versions can use `SecretString` or `SecretBinary`; string responses are returned as their exact bytes and no representation promise is inferred from an earlier version. Go strings can contain arbitrary bytes, so the environment bridge does not claim UTF-8 validity. Text-only provider drivers reject provider data that cannot be represented as valid UTF-8 and preserve valid text exactly without trimming or normalization. V1 defines no implicit base64 convention. Applications needing binary material in a string-only provider must own an explicit encoding and decode only after the disclosure boundary.
+Memory, mounted file, AWS, and Google declare `PayloadBytes`. Azure and Vault KV v2 string fields declare `PayloadUTF8`. AWS is byte-capable for every binding because different versions can use `SecretString` or `SecretBinary`; string responses are returned as their exact bytes and no representation promise is inferred from an earlier version. Text-only provider drivers reject provider data that cannot be represented as valid UTF-8 and preserve valid text exactly without trimming or normalization. V1 defines no implicit base64 convention. Applications needing binary material in a string-only provider must own an explicit encoding and decode only after the disclosure boundary.
 
 ## Keys, Paths, Fields, And Scope
 
@@ -658,42 +657,11 @@ Each configured App receives `App.Secrets() secrets.Reader`, commonly narrowed f
 
 Generated `.env.example` and `.env.testing` continue to follow the existing environment contract. They may hold non-secret bootstrap selectors only when the provider SDK requires them, never retrieved secret payloads. The Secrets component does not copy provider values into process environment variables.
 
-## Optional Environment Adapter
+## Relationship To Environment Secrets
 
-`github.com/goforj/envsecrets` is designed separately. The optional nested module `github.com/goforj/secrets/driver/envsecrets` may adapt a closed `envsecrets` catalog to the `secrets.Reader` interface for migrations or local development. It imports both root modules; neither root imports the adapter or the other root.
+`github.com/goforj/env/v2/envsecrets` captures explicitly declared environment variables during application configuration. It is not a source driver for this library. Process environment delivery lacks provider versions, per-read authorization, retry semantics, remote freshness, and the lifecycle expected by the driver contract.
 
-The driver requires an explicit immutable mapping from each `secrets.Key` to one declared `envsecrets` logical name. Adapter construction validates every mapped name against the Store's immutable manifest and fails before client publication if any name is unknown; declared optional-missing names remain valid mappings. Environment-variable names remain private to the `envsecrets.Manifest`. It accepts a narrow current-snapshot provider implemented by `envsecrets.Store`, reads the current snapshot at the start of each request, and never triggers refresh. It supports current selection only and derives its opaque revision from a random per-Store identity plus snapshot generation, never from secret bytes. The root stamps `Metadata.FetchedAt` when the adapter read completes; Snapshot `CapturedAt` does not enter the general Secrets freshness clock. It does not derive names automatically, enumerate the process environment, add source-specific public metadata, or fall back from a failed cloud read to an environment value.
-
-This driver declares `PayloadBytes`, `CacheAllowed=false`, `CoalescingAllowed=false`, and only lazy startup support because the environment snapshot is already the cache and atomic publication boundary but the adapter owns no freshness or refresh lifecycle. Root catalog construction rejects any outer cache, coalescing policy, `startup: required`, or `startup: readiness` binding, and GoForj rejects each during generation as well. Required environment validation happens when `envsecrets.New` constructs the Store, before the lazy bridge is published. A read admitted after `envsecrets.Store.Refresh` returns obtains a new snapshot and observes the new generation, even while a read against the prior generation is blocked. An already admitted read may finish against its prior snapshot. GoForj must require explicit selection of this driver and must not make it the production fallback.
-
-GoForj models an environment source declaration as an App-local factory inside the owning App:
-
-```yaml
-apps:
-  api:
-    components: [web_api, secrets, env_secrets]
-    secrets:
-      sources:
-        process_environment:
-          driver: envsecrets
-      bindings:
-        database.primary.password:
-          source: process_environment
-          env_secret: database.password
-          selectors: [current]
-          startup: lazy
-    env_secrets:
-      mode: secrets_driver
-      prefix: ORDERS_
-      bindings:
-        database.password:
-          environment: DATABASE_PASSWORD
-          requirement: require_non_empty
-```
-
-For each referencing App, generation constructs that App's own envsecrets Store and adapter. It never shares the Store, snapshot, Identity, binding map, or adapter across Apps; only ordinary provider transports may be shared. `env_secret` must name a declared logical binding in the same App's `env_secrets` block. `mode: secrets_driver` suppresses direct environment-secret injection and supplies the Store privately to the bridge, so the App has one public secret API. `mode: direct` rejects references from a Secrets environment source. Missing same-App component selection or configuration, cross-App references, non-current selectors, non-lazy startup, and duplicate mappings fail generation. The Store owns no closeable resource, and App shutdown drains the Secrets client before releasing its private Store handle.
-
-The bridge constructor itself owns a name-free error boundary for direct library users as well as generated wiring. It validates mappings, consumes any lower envsecrets error without formatting or wrapping it, and returns a fixed error containing at most the already-validated general Secrets key plus a stable construction class. Name exclusion is defined by provenance: the constructor never copies or formats the environment logical-name field, exact variable-name field, manifest, or lower AccessError into its fields, formatting, unwrap chain, observation, or panic path. Byte coincidence is not disclosure when an independently permitted general key or fixed class has the same spelling. During `secrets_driver` startup, generated wiring applies the same rule to envsecrets Store construction errors before invoking the bridge. Direct envsecrets mode retains its separate operator-facing error contract. Standalone bridge tests and render tests use distinct canary names to prove lower fields do not cross either boundary, then use collision fixtures in which an environment logical name equals a permitted general key or class to verify the structured provenance rule without an invalid substring assertion.
+Applications that can use either delivery mechanism define a narrow domain interface and select one implementation in application composition. An environment-backed implementation reads a captured `envsecrets.Value`; a managed implementation reads this library's `Reader`. GoForj does not translate between them, share keys between them, or fall back from one to the other. General Secrets tests use the memory source and fake rather than process environment variables.
 
 ## Testkit And Fakes
 
@@ -716,8 +684,6 @@ The conformance suite should test every source for:
 - idempotent shutdown with active reads.
 
 Lifecycle integration tests construct two App clients over one borrowed transport, close them in both orders, inject failure after every construction stage, exercise close deadlines with active reads, cancel every waiter before close, and prove the manager joins orphaned fills and closes the shared transport exactly once only after all borrowers drain. Tenant tests cover reversible token encoding, overlength rejection without truncation, normalization collisions, global cache bounds, and concurrent scoped views.
-
-Environment driver contract tests prove byte capability including invalid UTF-8, `CacheAllowed=false` rejects root and generated cache configuration, `CoalescingAllowed=false` prevents an old blocked read from capturing a post-refresh caller, required and readiness startup are rejected, root-stamped `FetchedAt` is independent of snapshot capture time, successful refresh changes the Store-generation revision even for identical bytes, exact and alias selection are unsupported, and reads admitted after refresh see the new snapshot.
 
 GoForj Testkit installs an App-scoped fake before resource construction. It supports required-key assertions and deterministic rotations without real cloud credentials. Generated integration tests can reveal known public fixture values explicitly, but failure messages should compare digests or lengths rather than print actual bytes.
 
@@ -816,11 +782,7 @@ Implement AWS, Google, Azure, and Vault in independent modules. For each driver,
 
 Add the optional component, strict generated config, typed key constants, App and tenant-scoped readers, startup/readiness, metrics, Lighthouse, Testkit, shutdown, multi-App coverage, and component-off parity. Update every module pin and render the maximum composition outside the repository directory.
 
-### Phase 5: Environment adapter
-
-After `envsecrets` has its own accepted design and stable reader contract, add the independent adapter module. Do not block the root library or cloud drivers on it.
-
-### Phase 6: Rotation consumers
+### Phase 5: Rotation consumers
 
 Only after concrete database, HTTP client, signer, and token-consumer lifecycles are proven should GoForj consider a coordinator. Its design must define atomic replacement and draining per consumer and must not claim exactly-once observation.
 
@@ -839,7 +801,7 @@ Only after concrete database, HTTP client, signer, and token-consumer lifecycles
 11. Every production driver passes root conformance plus the real-service coverage defined above.
 12. All nested modules pass tests independently and published resolution passes with `GOWORK=off`.
 13. Maximum generated composition renders in `/tmp`, builds, tests, and regenerates without a diff.
-14. The root module and `envsecrets` remain mutually independent; only the optional adapter imports both.
+14. The root module and `env/v2/envsecrets` remain mutually independent and provide no adapter or fallback between them.
 15. Documentation makes no zeroization, instantaneous rotation, atomic bulk-read, or exactly-once claim.
 
 ## Risks And Mitigations
