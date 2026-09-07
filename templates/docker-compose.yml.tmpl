@@ -36,7 +36,14 @@ services:
       - MARIADB_PASSWORD=${DB_PASSWORD}
       - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_ALLOW_EMPTY_PASSWORD=NO
+      - MARIADB_AUTO_UPGRADE=1
       - TZ=${TZ:-UTC}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - backend
 {{ end }}

@@ -102,7 +102,7 @@ func TestPlanNewProjectServiceTasksAddsMySQLWait(t *testing.T) {
 	if len(tasks.Pre) != 2 {
 		t.Fatalf("pre task count = %d, want Compose and MySQL wait", len(tasks.Pre))
 	}
-	if tasks.Pre[1].Name != "Waiting for Database to be ready" || !containsAllNewProjectServiceCommandFragments(tasks.Pre[1].Cmd, "exec -T mysql", "mysqladmin ping") {
+	if tasks.Pre[1].Name != "Waiting for Database to be ready" || !containsAllNewProjectServiceCommandFragments(tasks.Pre[1].Cmd, "exec -T mysql", "mariadb-admin ping", "mariadb -h") {
 		t.Fatalf("MySQL wait task = %#v", tasks.Pre[1])
 	}
 }
