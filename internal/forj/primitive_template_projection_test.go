@@ -260,6 +260,66 @@ func TestLighthouseUIUsesViteEightToolchain(t *testing.T) {
 	}
 }
 
+// TestLighthouseUIUsesTypeScriptSevenCompatibilityToolchain keeps native checking and Vue compiler API consumers on their supported runtimes.
+func TestLighthouseUIUsesTypeScriptSevenCompatibilityToolchain(t *testing.T) {
+	const packagePath = "internal/lighthouse/ui/package.json"
+	packageJSON, err := templatesFS.ReadFile(packagePath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", packagePath, err)
+	}
+	var manifest struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(packageJSON, &manifest); err != nil {
+		t.Fatalf("decode template %s: %v", packagePath, err)
+	}
+	for dependency, want := range map[string]string{
+		"@typescript/native": "npm:typescript@~7.0.2",
+		"typescript":         "npm:@typescript/typescript6@^6.0.2",
+	} {
+		if got := manifest.DevDependencies[dependency]; got != want {
+			t.Errorf("%s dependency = %q, want %q", dependency, got, want)
+		}
+	}
+
+	const lockPath = "internal/lighthouse/ui/package-lock.json"
+	packageLock, err := templatesFS.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", lockPath, err)
+	}
+	var lock struct {
+		Packages map[string]struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(packageLock, &lock); err != nil {
+		t.Fatalf("decode template %s: %v", lockPath, err)
+	}
+	for path, want := range map[string]struct {
+		name    string
+		version string
+	}{
+		"node_modules/@typescript/native": {name: "typescript", version: "7.0.2"},
+		"node_modules/typescript":         {name: "@typescript/typescript6", version: "6.0.2"},
+	} {
+		dependency := lock.Packages[path]
+		if dependency.Name != want.name || dependency.Version != want.version {
+			t.Errorf("locked %s = %s@%s, want %s@%s", path, dependency.Name, dependency.Version, want.name, want.version)
+		}
+	}
+
+	const configPath = "internal/lighthouse/ui/tsconfig.json"
+	config, err := templatesFS.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", configPath, err)
+	}
+	for _, marker := range []string{`"strict": false`, `"@/*": ["./src/*"]`} {
+		assertTemplateMarker(t, configPath, string(config), marker, true)
+	}
+	assertTemplateMarker(t, configPath, string(config), `"baseUrl"`, false)
+}
+
 // TestMailAboutBehaviorCoversEveryAppProjection verifies generated behavior coverage includes Mail-enabled and Mail-disabled Apps.
 func TestMailAboutBehaviorCoversEveryAppProjection(t *testing.T) {
 	workspace := currentProjectRenderWorkspace(t)
