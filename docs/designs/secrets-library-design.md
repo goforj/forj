@@ -1,19 +1,19 @@
-# Secrets Library And GoForj Integration Design
+# Secrets Library Design
 
 ## Status
 
 - Design status: proposed
 - Planning date: 2026-09-06
 - Last simplified: 2026-09-07
-- Target repositories: `github.com/goforj/secrets`, independent provider driver modules, and `goforj`
+- Target repositories: `github.com/goforj/secrets` and independent provider driver modules
 - Primary scope: one application-facing read operation over configured secret sources
 
 ## Summary
 
-GoForj should provide one way for application code to read a value from a configured secret source:
+The library should provide one way for application code to read a value from a configured secret source:
 
 ```go
-password, err := app.Secrets().Get(ctx, "DATABASE_PASSWORD")
+password, err := secretReader.Get(ctx, "DATABASE_PASSWORD")
 if err != nil {
 	return err
 }
@@ -22,7 +22,7 @@ if err != nil {
 `Get` returns the value as a Go string. A Go string preserves arbitrary bytes and is immutable, so the core API does not need separate `Secret`, `Value`, `Text`, or `Bytes` types. Applications that need a byte slice can convert explicitly:
 
 ```go
-privateKey, err := app.Secrets().Get(ctx, "TLS_PRIVATE_KEY")
+privateKey, err := secretReader.Get(ctx, "TLS_PRIVATE_KEY")
 if err != nil {
 	return err
 }
@@ -47,7 +47,7 @@ Create a small `github.com/goforj/secrets` module and independent provider drive
 2. Names use uppercase environment-style configuration vocabulary such as `DATABASE_PASSWORD`.
 3. Names are exact opaque identifiers. Underscores do not create a hierarchy and names never become provider paths.
 4. A trusted binding maps each name to one configured provider read.
-5. Callers cannot provide provider locators, endpoints, accounts, projects, vaults, mounts, filesystem paths, versions, aliases, Apps, or tenants to `Get`.
+5. Callers cannot provide provider locators, endpoints, accounts, projects, vaults, mounts, filesystem paths, versions, or aliases to `Get`.
 6. `Get` returns the fetched value directly. There is no disclosure accessor.
 7. Go strings preserve exact bytes, including empty, NUL, newline, and invalid UTF-8 sequences.
 8. Empty is a valid managed secret. A missing binding or provider value returns an error.
@@ -74,7 +74,7 @@ Features should not enter the public Reader merely because a provider exposes th
 3. Preserve returned bytes exactly.
 4. Keep errors and diagnostics free of secret material.
 5. Support deterministic tests with a tiny interface.
-6. Integrate with GoForj without affecting applications that do not enable the component.
+6. Remain framework-agnostic and usable through ordinary dependency injection.
 7. Verify every production driver against the real provider contract.
 
 ## Non-goals
@@ -105,7 +105,7 @@ type Reader interface {
 
 That interface is intentionally sufficient for domain code, application services, and tests.
 
-The root module may also expose a small construction seam for standalone use and generated GoForj wiring:
+The root module may also expose a small construction seam:
 
 ```go
 type ReadFunc func(ctx context.Context) (string, error)
@@ -187,9 +187,9 @@ Examples of trusted bindings:
 | `OAUTH_GITHUB_CLIENT_SECRET` | Vault mount, path, and field |
 | `TLS_PRIVATE_KEY` | Relative file below one configured root |
 
-Provider SDK clients are injected into driver construction so tests can control responses and applications can use standard workload identity configuration. Static cloud credentials and secret payloads never appear in GoForj-generated configuration.
+Provider SDK clients are injected into driver construction so tests can control responses and applications can use standard workload identity configuration. Static cloud credentials and secret payloads do not belong in source configuration.
 
-The code that constructs an SDK client or file root owns and closes it. Reader has no Close method, and a bound ReadFunc does not acquire independent ownership. Generated GoForj lifecycle code closes each owned dependency exactly once after application reads have stopped.
+The code that constructs an SDK client or file root owns and closes it. Reader has no Close method, and a bound ReadFunc does not acquire independent ownership. Application lifecycle code closes each owned dependency exactly once after reads have stopped.
 
 The mounted-file driver confines configured relative paths below its root, follows projected-volume symlinks only through race-safe containment, reads one bounded file descriptor, and preserves exact bytes.
 
@@ -203,66 +203,13 @@ Provider SDK retry behavior must be explicitly bounded during driver constructio
 
 Applications normally consume a secret while constructing another resource. Rotation becomes useful only when the application can replace and drain that resource safely. The Secrets library does not claim that observing a new provider value rotates a database pool, signer, token source, or HTTP client.
 
-GoForj readiness may call configured required names during startup. Liveness never depends on a secret provider. Detailed provider health stays internal to construction and operations rather than expanding Reader.
+Applications may read required secrets before reporting ready. Liveness never depends on a secret provider. Detailed provider health stays internal to construction and operations rather than expanding Reader.
 
-## GoForj Configuration
+## Framework Relationship
 
-A representative project configuration is:
+GoForj does not need a Secrets component, render configuration, generated accessor, template, or dependency pin. A GoForj application may construct and inject a `secrets.Reader` through ordinary application wiring exactly as it would use any framework-agnostic Go library.
 
-```yaml
-render:
-  components: [web_api, secrets]
-  secrets:
-    sources:
-      primary:
-        driver: aws_secrets_manager
-        region: us-east-1
-    bindings:
-      DATABASE_PASSWORD:
-        source: primary
-        secret_id: production/orders/database-password
-        startup: required
-apps:
-  worker:
-    components: [jobs, secrets]
-    secrets:
-      sources:
-        primary:
-          driver: google_secret_manager
-          project: orders-production
-      bindings:
-        QUEUE_CONSUMER_TOKEN:
-          source: primary
-          secret: queue-consumer-token
-          version: latest
-          startup: lazy
-```
-
-Configuration is strict and driver-specific. It does not use a free-form options map. Each binding belongs to exactly one App and one source. Duplicate names, unknown sources, unsupported version strategies, invalid locators, and selected components without configuration fail generation.
-
-Each configured App receives:
-
-```go
-func (a *App) Secrets() secrets.Reader
-```
-
-Component-off applications contain no Secrets imports, driver SDKs, generated configuration, or runtime initialization.
-
-GoForj may generate ordinary string constants for configured names:
-
-```go
-package secretkeys
-
-const DatabasePassword = "DATABASE_PASSWORD"
-```
-
-Constants provide autocomplete but do not create a wrapper type or force their use:
-
-```go
-password, err := app.Secrets().Get(ctx, secretkeys.DatabasePassword)
-```
-
-Generated configuration may contain provider locators when operators explicitly choose to commit them, but never payloads, private keys, cloud credentials, or Vault tokens. Logs, generated plans, readiness details, and Lighthouse output show counts and safe source identifiers, not locators or returned values.
+Required startup reads are application lifecycle decisions. Applications may read required secrets before reporting ready, while lazy consumers may read them when constructing or invoking the dependent resource. The library does not encode those policies in framework configuration.
 
 ## Environment Variables
 
@@ -274,7 +221,7 @@ password := env.MustGet("DATABASE_PASSWORD")
 
 Some environment values are sensitive, but their loading, precedence, scoping, reload behavior, and access semantics do not change because of that classification. The env package already warns callers not to pass secrets to `env.Dump`.
 
-No new environment-secret API or package is required. Applications explicitly choose whether `DATABASE_PASSWORD` is supplied through env or the managed Secrets component. Neither library performs fallback or precedence between the two.
+No new environment-secret API or package is required. Applications explicitly choose whether `DATABASE_PASSWORD` is supplied through env or a managed-provider Reader. Neither library performs fallback or precedence between the two.
 
 ## Testing
 
@@ -293,8 +240,6 @@ Each provider driver has a shared contract suite plus provider-specific tests. R
 
 Mocks and emulators improve fast feedback but do not replace live compatibility tests. Every integration suite creates isolated resources, uses conspicuously public fixtures, and cleans them up.
 
-GoForj render tests cover the default App, named Apps, every driver, invalid configuration, component-off output, Testkit composition, and the maximum supported generated composition. Test renders always run outside the repository directory.
-
 ## Compatibility
 
 Before v1, freeze only:
@@ -307,7 +252,7 @@ Before v1, freeze only:
 
 Adding a driver does not change the root application API. Changing name grammar, empty-value handling, byte preservation, error classification, or the meaning of a configured provider version is a runtime compatibility change.
 
-The root module does not depend on GoForj or provider SDKs. Each driver module pins its own SDK and is released independently. GoForj pins every selected module explicitly and validates published resolution with `GOWORK=off`.
+The root module does not depend on GoForj or provider SDKs. Each driver module pins its own SDK and is released independently.
 
 ## Implementation Plan
 
@@ -323,11 +268,7 @@ Implement the mounted-file driver and its confinement, exact-byte, Docker, and K
 
 Implement AWS, Google Cloud, Azure, and Vault driver modules. Require shared contract tests and real-service integration coverage for every release.
 
-### Phase 4: GoForj integration
-
-Add strict generated configuration, App-scoped Readers, optional string constants, startup readiness for required names, Testkit support, component-off parity, and maximum-composition render validation.
-
-### Phase 5: Evidence-driven additions
+### Phase 4: Evidence-driven additions
 
 Add caching, retries, richer errors, metadata, dynamic version selection, or rotation coordination only after concrete applications demonstrate the need and the behavior can remain behind the minimal Reader where possible.
 
@@ -341,7 +282,7 @@ Add caching, retries, richer errors, metadata, dynamic version selection, or rot
 6. Errors and diagnostics never disclose returned values, locators, credentials, or provider SDK errors.
 7. Every production driver passes shared contract tests and real-service integration coverage.
 8. Environment variables continue to use env.MustGet and require no new package or API.
-9. Component-off GoForj output contains no Secrets artifacts or dependencies.
+9. GoForj requires no component, render configuration, generated accessor, template, or special integration.
 10. The design makes no zeroization, automatic rotation, atomic bulk-read, or exactly-once claim.
 
 ## References
