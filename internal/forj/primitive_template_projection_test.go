@@ -183,6 +183,83 @@ func TestStorageTemplatesExposeBackendDeleteCapabilities(t *testing.T) {
 	}
 }
 
+// TestLighthouseUIUsesViteEightToolchain keeps the embedded frontend on the reviewed Vite generation and config API.
+func TestLighthouseUIUsesViteEightToolchain(t *testing.T) {
+	const packagePath = "internal/lighthouse/ui/package.json"
+	packageJSON, err := templatesFS.ReadFile(packagePath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", packagePath, err)
+	}
+	var manifest struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(packageJSON, &manifest); err != nil {
+		t.Fatalf("decode template %s: %v", packagePath, err)
+	}
+	if got, want := manifest.DevDependencies["vite"], "^8.2.2"; got != want {
+		t.Fatalf("Vite dependency = %q, want %q", got, want)
+	}
+
+	const lockPath = "internal/lighthouse/ui/package-lock.json"
+	packageLock, err := templatesFS.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", lockPath, err)
+	}
+	var lock struct {
+		Packages map[string]struct {
+			Version string            `json:"version"`
+			Engines map[string]string `json:"engines"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(packageLock, &lock); err != nil {
+		t.Fatalf("decode template %s: %v", lockPath, err)
+	}
+	vite := lock.Packages["node_modules/vite"]
+	if got, want := vite.Version, "8.2.2"; got != want {
+		t.Fatalf("locked Vite version = %q, want %q", got, want)
+	}
+	if got, want := vite.Engines["node"], "^20.19.0 || >=22.12.0"; got != want {
+		t.Fatalf("locked Vite Node requirement = %q, want %q", got, want)
+	}
+
+	const configPath = "internal/lighthouse/ui/vite.config.ts"
+	config, err := templatesFS.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", configPath, err)
+	}
+	assertTemplateMarker(t, configPath, string(config), `resolve(import.meta.dirname, "src")`, true)
+	for _, obsolete := range []string{"__dirname", "rollupOptions", "esbuild"} {
+		assertTemplateMarker(t, configPath, string(config), obsolete, false)
+	}
+
+	const indexPath = "internal/lighthouse/ui/dist/index.html"
+	indexHTML, err := templatesFS.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", indexPath, err)
+	}
+	const assetsPath = "internal/lighthouse/ui/dist/assets"
+	assets, err := templatesFS.ReadDir(assetsPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", assetsPath, err)
+	}
+	bundleCounts := map[string]int{".css": 0, ".js": 0}
+	for _, asset := range assets {
+		extension := filepath.Ext(asset.Name())
+		if _, tracked := bundleCounts[extension]; !tracked {
+			continue
+		}
+		bundleCounts[extension]++
+		if !strings.Contains(string(indexHTML), "/lighthouse/assets/"+asset.Name()) {
+			t.Errorf("%s does not reference built asset %s", indexPath, asset.Name())
+		}
+	}
+	for extension, count := range bundleCounts {
+		if count != 1 {
+			t.Errorf("built Lighthouse %s bundle count = %d, want 1", extension, count)
+		}
+	}
+}
+
 // TestMailAboutBehaviorCoversEveryAppProjection verifies generated behavior coverage includes Mail-enabled and Mail-disabled Apps.
 func TestMailAboutBehaviorCoversEveryAppProjection(t *testing.T) {
 	workspace := currentProjectRenderWorkspace(t)
