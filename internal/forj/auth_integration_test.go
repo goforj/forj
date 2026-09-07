@@ -707,7 +707,7 @@ func resetRenderedMySQLAuthDatabase(t *testing.T, started *testkit.StartedContai
 		started.Container,
 		[]string{
 			"sh", "-lc",
-			`mysql -h 127.0.0.1 -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e 'DROP TABLE IF EXISTS auth_login_attempts; DROP TABLE IF EXISTS auth_password_resets; DROP TABLE IF EXISTS auth_email_verifications; DROP TABLE IF EXISTS auth_sessions; DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS migrations;'`,
+			`mariadb -h 127.0.0.1 -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e 'DROP TABLE IF EXISTS auth_login_attempts; DROP TABLE IF EXISTS auth_password_resets; DROP TABLE IF EXISTS auth_email_verifications; DROP TABLE IF EXISTS auth_sessions; DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS migrations;'`,
 		},
 		20*time.Second,
 	); err != nil {

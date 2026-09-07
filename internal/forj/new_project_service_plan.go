@@ -3,7 +3,7 @@ package forj
 import "github.com/goforj/goforj/project"
 
 const (
-	generatedMySQLDevWaitCommand = "docker-compose exec -T mysql sh -c 'while ! mysqladmin ping -h \"mysql\" --silent; do sleep .5; done; mysql -h \"mysql\" -uroot -p\"$MARIADB_ROOT_PASSWORD\" -e \"CREATE DATABASE IF NOT EXISTS \\`$MARIADB_DATABASE\\`;\"'"
+	generatedMySQLDevWaitCommand = "docker-compose exec -T mysql sh -c 'while ! mariadb-admin ping -h \"mysql\" --silent; do sleep .5; done; mariadb -h \"mysql\" -uroot -p\"$MARIADB_ROOT_PASSWORD\" -e \"CREATE DATABASE IF NOT EXISTS \\`$MARIADB_DATABASE\\`;\"'"
 )
 
 // generatedPostgresDevWaitCommand wraps the shared authenticated creation script for the initial Compose lifecycle.

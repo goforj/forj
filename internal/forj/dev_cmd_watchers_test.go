@@ -838,7 +838,8 @@ func TestDevAppsChangedComparesAppNames(t *testing.T) {
 func TestCreateDatabaseScriptsIncludeAllDatabases(t *testing.T) {
 	mysqlScript := mysqlCreateDatabasesScript([]string{"billing", "db"})
 	for _, want := range []string{
-		`mysqladmin ping`,
+		`mariadb-admin ping`,
+		`mariadb -h "mysql"`,
 		`for db in billing db`,
 		"CREATE DATABASE IF NOT EXISTS \\`$db\\`;",
 		"GRANT ALL PRIVILEGES ON \\`$db\\`.* TO '$MARIADB_USER'@'%';",

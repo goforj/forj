@@ -469,7 +469,7 @@ func (c *DBShellCmd) composeLaunch(conn dbShellConnection) (dbShellLaunch, error
 	for _, key := range dbShellSortedEnvKeys(envVars) {
 		dockerArgs = append(dockerArgs, "-e", key)
 	}
-	dockerArgs = append(dockerArgs, service, conn.localClient())
+	dockerArgs = append(dockerArgs, service, conn.composeClient())
 	dockerArgs = append(dockerArgs, args...)
 	return dbShellLaunch{
 		Method:  "compose",
@@ -1098,6 +1098,16 @@ func (c dbShellConnection) localClient() string {
 		return "sqlite3"
 	default:
 		return ""
+	}
+}
+
+// composeClient maps generated services to the client executable provided by their container image.
+func (c dbShellConnection) composeClient() string {
+	switch c.Driver {
+	case "mysql":
+		return "mariadb"
+	default:
+		return c.localClient()
 	}
 }
 

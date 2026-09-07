@@ -372,6 +372,9 @@ func TestDBShellComposePreservesResourceIdentityAndSecrets(t *testing.T) {
 	if launch.Env["MYSQL_PWD"] != "secret" || strings.Contains(strings.Join(launch.Args, " "), "secret") {
 		t.Fatalf("compose secret transport = %#v, args %q", launch.Env, strings.Join(launch.Args, " "))
 	}
+	if !strings.Contains(strings.Join(launch.Args, " "), "mysql mariadb") {
+		t.Fatalf("compose args = %q, want MariaDB container client", strings.Join(launch.Args, " "))
+	}
 	command.Exec = "select 1"
 	scripted, err := command.composeLaunch(local)
 	if err != nil {
@@ -667,7 +670,7 @@ func TestFormatDBShellCommandRedactsClientSecretFlags(t *testing.T) {
 				"--dbname=postgres://user:url-secret@[bad/reports?password=query-secret",
 			},
 		},
-		{Command: "docker", Args: []string{"compose", "exec", "mysql", "mysql", "-pcompose-secret"}},
+		{Command: "docker", Args: []string{"compose", "exec", "mysql", "mariadb", "-pcompose-secret"}},
 	}
 	for _, launch := range launches {
 		printed := formatDBShellCommand(launch, true)

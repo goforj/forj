@@ -661,7 +661,7 @@ func validateDevDatabaseName(name string) error {
 
 // mysqlCreateDatabasesScript creates every needed MySQL database after the service is ready.
 func mysqlCreateDatabasesScript(names []string) string {
-	return `while ! mysqladmin ping -h "mysql" --silent; do sleep .5; done; for db in ` + strings.Join(names, " ") + `; do mysql -h "mysql" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \` + "`" + `$db\` + "`" + `; GRANT ALL PRIVILEGES ON \` + "`" + `$db\` + "`" + `.* TO '$MARIADB_USER'@'%';"; done; mysql -h "mysql" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"`
+	return `while ! mariadb-admin ping -h "mysql" --silent; do sleep .5; done; for db in ` + strings.Join(names, " ") + `; do mariadb -h "mysql" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \` + "`" + `$db\` + "`" + `; GRANT ALL PRIVILEGES ON \` + "`" + `$db\` + "`" + `.* TO '$MARIADB_USER'@'%';"; done; mariadb -h "mysql" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"`
 }
 
 // postgresCreateDatabasesScript creates every needed Postgres database after the service is ready.
