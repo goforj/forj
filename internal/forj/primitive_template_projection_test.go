@@ -183,6 +183,56 @@ func TestStorageTemplatesExposeBackendDeleteCapabilities(t *testing.T) {
 	}
 }
 
+// TestReactStarterUsesTypeScriptSevenToolchain keeps the starter compiler and configuration on the reviewed native generation.
+func TestReactStarterUsesTypeScriptSevenToolchain(t *testing.T) {
+	const packagePath = "starter-kits/react/frontend/package.json"
+	packageJSON, err := templatesFS.ReadFile(packagePath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", packagePath, err)
+	}
+	var manifest struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(packageJSON, &manifest); err != nil {
+		t.Fatalf("decode template %s: %v", packagePath, err)
+	}
+	if got, want := manifest.DevDependencies["typescript"], "~7.0.2"; got != want {
+		t.Fatalf("TypeScript dependency = %q, want %q", got, want)
+	}
+
+	const lockPath = "starter-kits/react/frontend/package-lock.json"
+	packageLock, err := templatesFS.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", lockPath, err)
+	}
+	var lock struct {
+		Packages map[string]struct {
+			Version   string `json:"version"`
+			Integrity string `json:"integrity"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(packageLock, &lock); err != nil {
+		t.Fatalf("decode template %s: %v", lockPath, err)
+	}
+	typescript := lock.Packages["node_modules/typescript"]
+	if got, want := typescript.Version, "7.0.2"; got != want {
+		t.Fatalf("locked TypeScript version = %q, want %q", got, want)
+	}
+	if got, want := typescript.Integrity, "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA=="; got != want {
+		t.Fatalf("locked TypeScript integrity = %q, want %q", got, want)
+	}
+
+	const configPath = "starter-kits/react/frontend/tsconfig.json"
+	config, err := templatesFS.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read template %s: %v", configPath, err)
+	}
+	for _, marker := range []string{`"strict": true`, `"@/*": ["./src/*"]`} {
+		assertTemplateMarker(t, configPath, string(config), marker, true)
+	}
+	assertTemplateMarker(t, configPath, string(config), `"baseUrl"`, false)
+}
+
 // TestLighthouseUIUsesViteEightToolchain keeps the embedded frontend on the reviewed Vite generation and config API.
 func TestLighthouseUIUsesViteEightToolchain(t *testing.T) {
 	const packagePath = "internal/lighthouse/ui/package.json"
