@@ -106,6 +106,59 @@ func TestBuildHTTPAccessSignatureIgnoresLatencyAndError(t *testing.T) {
 	}
 }
 
+func TestMandatoryMessagePreflightCoversDefaultPatterns(t *testing.T) {
+	patterns := []string{
+		"PASSWORD=one",
+		"passwd:two",
+		"secret=three",
+		"TOKEN=four",
+		"Authorization:five",
+		"Cookie=six",
+		"api_key=seven",
+		"api-key=eight",
+		"apikey=nine",
+		"client_secret=ten",
+		"client-secret=eleven",
+		"Bearer abc.def",
+	}
+	policy := defaultRedactionPolicy()
+	for _, message := range patterns {
+		if !logMessageNeedsRedaction(policy, message) {
+			t.Fatalf("mandatory message preflight missed %q", message)
+		}
+		redacted := redactLogMessage(policy, message)
+		if strings.Contains(redacted, message) || !strings.Contains(redacted, redactedLogValue) {
+			t.Fatalf("mandatory message was not redacted: input=%q output=%q", message, redacted)
+		}
+	}
+}
+
+func TestRedactLogEntryReusesUnchangedTypedState(t *testing.T) {
+	fields := []eventField{
+		{key: "route", value: "/health"},
+		{key: "status", value: 200},
+	}
+	entry := LogEntry{
+		Level:         "info",
+		Message:       "handled",
+		signature:     "handled|level=info|route=/health|status=200",
+		orderedFields: fields,
+	}
+	redacted := redactLogEntry(entry)
+	if !redacted.redacted {
+		t.Fatal("expected entry to record completed redaction")
+	}
+	if redacted.signature != entry.signature {
+		t.Fatalf("unchanged entry rebuilt signature: got %q want %q", redacted.signature, entry.signature)
+	}
+	if &redacted.orderedFields[0] != &fields[0] {
+		t.Fatal("unchanged entry copied ordered fields")
+	}
+	if redacted.Fields != nil {
+		t.Fatalf("unchanged entry materialized fields: %#v", redacted.Fields)
+	}
+}
+
 func TestEventPoolDoesNotLeakFieldsAcrossEmits(t *testing.T) {
 	t.Setenv("APP_LOG_FORMAT", "json")
 	t.Setenv(logDedupeEnabledEnv, "false")

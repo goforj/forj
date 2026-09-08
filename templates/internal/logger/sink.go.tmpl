@@ -1,0 +1,229 @@
+package logger
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"sync"
+	"time"
+)
+
+// Sink delivers a structured entry and may report a delivery failure.
+type Sink interface {
+	Deliver(LogEntry) error
+}
+
+// SinkFunc adapts a delivery function to Sink.
+type SinkFunc func(LogEntry) error
+
+// Deliver delivers entry through f.
+func (f SinkFunc) Deliver(entry LogEntry) error {
+	return f(entry)
+}
+
+// SinkOverflowPolicy controls what happens when an asynchronous sink queue is full.
+type SinkOverflowPolicy string
+
+const (
+	// SinkOverflowBlock waits for queue capacity.
+	SinkOverflowBlock SinkOverflowPolicy = "block"
+	// SinkOverflowDropNewest drops the entry being delivered.
+	SinkOverflowDropNewest SinkOverflowPolicy = "drop-newest"
+	// SinkOverflowDropOldest removes the oldest queued entry to retain recent context.
+	SinkOverflowDropOldest SinkOverflowPolicy = "drop-oldest"
+)
+
+// SinkOptions configures an opt-in sink registration.
+type SinkOptions struct {
+	Name          string
+	Async         bool
+	QueueCapacity int
+	Overflow      SinkOverflowPolicy
+}
+
+type sinkRegistration interface {
+	deliver(LogEntry)
+	flush(context.Context) error
+	retainsEntry() bool
+}
+
+type callbackSink struct {
+	sink LogSink
+}
+
+// deliver preserves AddSink's synchronous, immediate callback behavior.
+func (s callbackSink) deliver(entry LogEntry) {
+	defer recoverSinkFailure("callback")
+	s.sink(entry)
+}
+
+// flush completes immediately because callbacks are synchronous.
+func (s callbackSink) flush(context.Context) error {
+	return nil
+}
+
+// retainsEntry reports that callback delivery finishes before the emit operation returns.
+func (s callbackSink) retainsEntry() bool {
+	return false
+}
+
+type managedSink struct {
+	name string
+	sink Sink
+}
+
+// deliver isolates panics and errors so one optional destination cannot stop later sinks.
+func (s managedSink) deliver(entry LogEntry) {
+	defer recoverSinkFailure(s.name)
+	if err := s.sink.Deliver(entry); err != nil {
+		reportSinkFailure(s.name, err)
+	}
+}
+
+// flush delegates when the sink supports context-bounded shutdown.
+func (s managedSink) flush(ctx context.Context) error {
+	if sink, ok := s.sink.(interface{ Flush(context.Context) error }); ok {
+		return sink.Flush(ctx)
+	}
+	return nil
+}
+
+// retainsEntry reports that managed synchronous delivery finishes before returning.
+func (s managedSink) retainsEntry() bool {
+	return false
+}
+
+type asyncSink struct {
+	name        string
+	sink        Sink
+	queue       chan LogEntry
+	done        chan struct{}
+	closingDone chan struct{}
+	overflow    SinkOverflowPolicy
+	mu          sync.Mutex
+	queueMu     sync.Mutex
+	closing     bool
+	senders     sync.WaitGroup
+	once        sync.Once
+}
+
+// newAsyncSink starts one long-lived worker for a bounded queue.
+func newAsyncSink(name string, sink Sink, capacity int, overflow SinkOverflowPolicy) *asyncSink {
+	async := &asyncSink{name: name, sink: sink, queue: make(chan LogEntry, capacity), done: make(chan struct{}), closingDone: make(chan struct{}), overflow: overflow}
+	go async.run()
+	return async
+}
+
+// deliver accepts an entry according to the configured overflow policy.
+func (s *asyncSink) deliver(entry LogEntry) {
+	s.mu.Lock()
+	if s.closing {
+		s.mu.Unlock()
+		reportSinkFailure(s.name, fmt.Errorf("sink is closing; entry dropped"))
+		return
+	}
+	s.senders.Add(1)
+	s.mu.Unlock()
+	defer s.senders.Done()
+
+	switch s.overflow {
+	case SinkOverflowBlock:
+		select {
+		case s.queue <- entry:
+		case <-s.closingDone:
+		}
+	case SinkOverflowDropOldest:
+		s.queueMu.Lock()
+		defer s.queueMu.Unlock()
+		select {
+		case s.queue <- entry:
+		default:
+			select {
+			case <-s.queue:
+				reportSinkFailure(s.name, fmt.Errorf("sink queue full; oldest entry dropped"))
+			default:
+			}
+			select {
+			case s.queue <- entry:
+			default:
+			}
+		}
+	default:
+		s.queueMu.Lock()
+		defer s.queueMu.Unlock()
+		select {
+		case s.queue <- entry:
+		default:
+			reportSinkFailure(s.name, fmt.Errorf("sink queue full; newest entry dropped"))
+		}
+	}
+}
+
+// retainsEntry reports that queued delivery outlives the caller's emit operation.
+func (s *asyncSink) retainsEntry() bool {
+	return true
+}
+
+// flush closes acceptance and waits for accepted entries or the caller's shutdown budget.
+func (s *asyncSink) flush(ctx context.Context) error {
+	s.once.Do(func() {
+		s.mu.Lock()
+		s.closing = true
+		close(s.closingDone)
+		s.mu.Unlock()
+		go func() {
+			s.senders.Wait()
+			close(s.queue)
+		}()
+	})
+	select {
+	case <-s.done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("async sink %q flush: %w", s.name, ctx.Err())
+	}
+}
+
+// run serializes FIFO delivery for entries accepted by this asynchronous sink.
+func (s *asyncSink) run() {
+	defer close(s.done)
+	for entry := range s.queue {
+		func() {
+			defer recoverSinkFailure(s.name)
+			if err := s.sink.Deliver(entry); err != nil {
+				reportSinkFailure(s.name, err)
+			}
+		}()
+	}
+}
+
+// recoverSinkFailure turns a sink panic into the same isolated fallback diagnostic as an error.
+func recoverSinkFailure(name string) {
+	if recovered := recover(); recovered != nil {
+		reportSinkFailure(name, fmt.Errorf("sink panic: %v", recovered))
+	}
+}
+
+var sinkFailureReporter = struct {
+	sync.Mutex
+	last map[string]time.Time
+}{last: make(map[string]time.Time)}
+
+// reportSinkFailure writes a rate-limited diagnostic without re-entering the application logger.
+func reportSinkFailure(name string, err error) {
+	if err == nil {
+		return
+	}
+	if name == "" {
+		name = "unnamed"
+	}
+	sinkFailureReporter.Lock()
+	last := sinkFailureReporter.last[name]
+	if time.Since(last) < time.Minute {
+		sinkFailureReporter.Unlock()
+		return
+	}
+	sinkFailureReporter.last[name] = time.Now()
+	sinkFailureReporter.Unlock()
+	_, _ = fmt.Fprintf(os.Stderr, "logger sink %s failed\n", name)
+}

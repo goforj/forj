@@ -26,17 +26,17 @@ const (
 )
 
 type dedupeWriter struct {
-	out          io.Writer
-	enabled      bool
-	window       time.Duration
-	burst        int
-	summaryEvery int
-	maxKeys      int
-	compactEvery int
+	out           io.Writer
+	enabled       bool
+	window        time.Duration
+	burst         int
+	summaryEvery  int
+	maxKeys       int
+	compactEvery  int
 	opsSinceSweep int
-	mu           sync.Mutex
-	pending      bytes.Buffer
-	entries      map[string]*dedupeEntry
+	mu            sync.Mutex
+	pending       bytes.Buffer
+	entries       map[string]*dedupeEntry
 }
 
 type dedupeEntry struct {
@@ -48,15 +48,15 @@ type dedupeEntry struct {
 }
 
 type sinkDedupe struct {
-	enabled      bool
-	window       time.Duration
-	burst        int
-	summaryEvery int
-	maxKeys      int
-	compactEvery int
+	enabled       bool
+	window        time.Duration
+	burst         int
+	summaryEvery  int
+	maxKeys       int
+	compactEvery  int
 	opsSinceSweep int
-	mu           sync.Mutex
-	entries      map[string]*sinkDedupeEntry
+	mu            sync.Mutex
+	entries       map[string]*sinkDedupeEntry
 }
 
 type sinkDedupeEntry struct {
@@ -266,15 +266,19 @@ func cloneLogEntry(entry LogEntry) LogEntry {
 	if entry.Fields != nil {
 		cloned.Fields = make(map[string]any, len(entry.Fields))
 		for key, value := range entry.Fields {
-			cloned.Fields[key] = value
+			cloned.Fields[key] = cloneLogValue(value)
 		}
 	}
 	if len(entry.orderedFields) > 0 {
 		cloned.orderedFields = make([]eventField, len(entry.orderedFields))
-		copy(cloned.orderedFields, entry.orderedFields)
+		for index, field := range entry.orderedFields {
+			cloned.orderedFields[index] = eventField{key: field.key, value: cloneLogValue(field.value)}
+		}
 	}
 	cloned.compact = entry.compact
 	cloned.compactValues = append([]string(nil), entry.compactValues...)
+	cloned.unordered = entry.unordered
+	cloned.redacted = entry.redacted
 	return cloned
 }
 

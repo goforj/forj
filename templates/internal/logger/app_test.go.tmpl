@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +20,38 @@ import (
 	"{{ .GoModuleName }}/internal/logger"
 	"{{ .GoModuleName }}/internal/runtime"
 )
+
+type testManagedSink struct {
+	mu      sync.Mutex
+	entries []logger.LogEntry
+	err     error
+}
+
+type stalledManagedSink struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+// Deliver blocks until release so tests can saturate an asynchronous sink queue.
+func (s *stalledManagedSink) Deliver(logger.LogEntry) error {
+	s.once.Do(func() { close(s.started) })
+	<-s.release
+	return nil
+}
+
+func (s *testManagedSink) Deliver(entry logger.LogEntry) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.entries = append(s.entries, entry)
+	return s.err
+}
+
+func (s *testManagedSink) Entries() []logger.LogEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]logger.LogEntry(nil), s.entries...)
+}
 
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
@@ -213,6 +248,271 @@ func TestAppLoggerJSONFormat(t *testing.T) {
 	}
 	if _, ok := payload["time"]; ok {
 		t.Fatalf("did not expect time field by default, got %#v", payload)
+	}
+}
+
+func TestAppLoggerRedactsOutputAndSinksBeforeDedupe(t *testing.T) {
+	t.Setenv("APP_LOG_FORMAT", "json")
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	output := captureStderr(t, func() {
+		appLogger := logger.NewAppLogger()
+		appLogger.AddSink(func(entry logger.LogEntry) {
+			if entry.Fields["password"] != "[REDACTED]" {
+				t.Fatalf("expected redacted sink field, got %#v", entry.Fields["password"])
+			}
+			if strings.Contains(entry.Message, "super-secret") {
+				t.Fatalf("expected redacted sink message, got %q", entry.Message)
+			}
+		})
+		appLogger.Info().Str("password", "super-secret").Any("nested", map[string]any{"token": "nested-secret"}).Msg("login password=super-secret Bearer abc.def")
+	})
+	if strings.Contains(output, "super-secret") || strings.Contains(output, "nested-secret") || strings.Contains(output, "abc.def") {
+		t.Fatalf("expected redacted output, got %q", output)
+	}
+	if !strings.Contains(output, "[REDACTED]") {
+		t.Fatalf("expected redaction marker, got %q", output)
+	}
+}
+
+func TestAppLoggerRedactsConfiguredKeysAndMessagePatterns(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	t.Setenv("APP_LOG_REDACT_KEYS", "customer_reference, session_id")
+	t.Setenv("APP_LOG_REDACT_MESSAGE_PATTERNS", `["trace=[A-Za-z0-9]+"]`)
+	appLogger := logger.NewAppLogger()
+	entries := make([]logger.LogEntry, 0, 1)
+	appLogger.AddSink(func(entry logger.LogEntry) {
+		entries = append(entries, entry)
+	})
+	appLogger.Info().Str("customer_reference", "customer-123").Msg("request trace=abc123 completed")
+	if len(entries) != 1 {
+		t.Fatalf("expected one entry, got %#v", entries)
+	}
+	if entries[0].Fields["customer_reference"] != "[REDACTED]" {
+		t.Fatalf("expected configured key redaction, got %#v", entries[0].Fields)
+	}
+	if strings.Contains(entries[0].Message, "abc123") || !strings.Contains(entries[0].Message, "[REDACTED]") {
+		t.Fatalf("expected configured message pattern redaction, got %q", entries[0].Message)
+	}
+}
+
+func TestAppLoggerHTTPAccessRedactsSensitiveURIOnFastPath(t *testing.T) {
+	t.Setenv("APP_LOG_FORMAT", "json")
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	var entries []logger.LogEntry
+	output := captureStderr(t, func() {
+		appLogger := logger.NewAppLogger()
+		appLogger.AddSink(func(entry logger.LogEntry) {
+			entries = append(entries, entry)
+		})
+		appLogger.HTTPAccess("/callback?token=top-secret", http.StatusOK, http.MethodGet, time.Millisecond, nil)
+	})
+	if strings.Contains(output, "top-secret") || !strings.Contains(output, "[REDACTED]") {
+		t.Fatalf("expected redacted HTTP output, got %q", output)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected one HTTP sink entry, got %#v", entries)
+	}
+	if uri, _ := entries[0].Fields["uri"].(string); strings.Contains(uri, "top-secret") || !strings.Contains(uri, "[REDACTED]") {
+		t.Fatalf("expected redacted HTTP sink URI, got %#v", entries[0].Fields["uri"])
+	}
+}
+
+func TestAppLoggerRejectsInvalidConfiguredMessagePattern(t *testing.T) {
+	t.Setenv("APP_LOG_REDACT_MESSAGE_PATTERNS", `["("]`)
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected invalid redaction pattern to panic during logger construction")
+		}
+	}()
+	_ = logger.NewAppLogger()
+}
+
+func TestAppLoggerSinkOrderAndIsolation(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	appLogger := logger.NewAppLogger()
+	order := make([]string, 0, 2)
+	appLogger.AddSink(func(entry logger.LogEntry) {
+		order = append(order, "first")
+		entry.Fields["mutated"] = true
+		entry.Fields["nested"].(map[string]any)["mutated"] = true
+	})
+	appLogger.AddSink(func(entry logger.LogEntry) {
+		order = append(order, "second")
+		if _, ok := entry.Fields["mutated"]; ok {
+			t.Fatal("expected each sink to receive an isolated entry")
+		}
+		if _, ok := entry.Fields["nested"].(map[string]any)["mutated"]; ok {
+			t.Fatal("expected nested sink fields to be isolated")
+		}
+	})
+	appLogger.Info().Str("token", "secret").Any("nested", map[string]any{"value": "safe"}).Msg("ordered")
+	if strings.Join(order, ",") != "first,second" {
+		t.Fatalf("expected registration order, got %#v", order)
+	}
+}
+
+func TestAppLoggerLegacyWriterRedactsStructuredEntries(t *testing.T) {
+	t.Setenv("APP_LOG_FORMAT", "json")
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	output := captureStderr(t, func() {
+		appLogger := logger.NewAppLogger()
+		writer := appLogger.GetWriter()
+		writer.Info().Str("authorization", "Bearer top-secret").Msg("request token=top-secret")
+	})
+	if strings.Contains(output, "top-secret") || !strings.Contains(output, "[REDACTED]") {
+		t.Fatalf("expected legacy writer output to be redacted, got %q", output)
+	}
+}
+
+func TestAppLoggerAsyncSinkFlushesAcceptedEntries(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	appLogger := logger.NewAppLogger()
+	sink := &testManagedSink{}
+	if err := appLogger.AddSinkWithOptions(sink, logger.SinkOptions{Async: true, QueueCapacity: 2, Overflow: logger.SinkOverflowBlock}); err != nil {
+		t.Fatalf("add async sink: %v", err)
+	}
+	appLogger.Info().Msg("accepted")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := appLogger.FlushSinks(ctx); err != nil {
+		t.Fatalf("flush async sink: %v", err)
+	}
+	if entries := sink.Entries(); len(entries) != 1 || entries[0].Message != "accepted" {
+		t.Fatalf("expected flushed entry, got %#v", entries)
+	}
+}
+
+func TestAppLoggerAsyncBlockingSinkFlushHonorsCancellationWhenQueueIsFull(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	appLogger := logger.NewAppLogger()
+	sink := &stalledManagedSink{started: make(chan struct{}), release: make(chan struct{})}
+	if err := appLogger.AddSinkWithOptions(sink, logger.SinkOptions{Async: true, QueueCapacity: 1, Overflow: logger.SinkOverflowBlock}); err != nil {
+		t.Fatalf("add async sink: %v", err)
+	}
+
+	appLogger.Info().Msg("in-flight")
+	select {
+	case <-sink.started:
+	case <-time.After(time.Second):
+		t.Fatal("expected sink delivery to start")
+	}
+	appLogger.Info().Msg("queued")
+
+	deliverDone := make(chan struct{})
+	go func() {
+		appLogger.Info().Msg("blocked")
+		close(deliverDone)
+	}()
+	select {
+	case <-deliverDone:
+		t.Fatal("expected full blocking sink queue to block delivery")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	flushDone := make(chan error, 1)
+	go func() {
+		flushDone <- appLogger.FlushSinks(ctx)
+	}()
+	select {
+	case err := <-flushDone:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected canceled flush, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected canceled flush to return")
+	}
+	select {
+	case <-deliverDone:
+	case <-time.After(time.Second):
+		t.Fatal("expected blocked delivery to stop when sink closes")
+	}
+
+	deadlineCtx, deadlineCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer deadlineCancel()
+	if err := appLogger.FlushSinks(deadlineCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline-exceeded flush, got %v", err)
+	}
+
+	close(sink.release)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := appLogger.FlushSinks(ctx); err != nil {
+		t.Fatalf("flush released sink: %v", err)
+	}
+}
+
+func TestAppLoggerAsyncDropOldestSinkFlushesAfterConcurrentDelivery(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	appLogger := logger.NewAppLogger()
+	sink := &stalledManagedSink{started: make(chan struct{}), release: make(chan struct{})}
+	if err := appLogger.AddSinkWithOptions(sink, logger.SinkOptions{Async: true, QueueCapacity: 1, Overflow: logger.SinkOverflowDropOldest}); err != nil {
+		t.Fatalf("add async sink: %v", err)
+	}
+
+	appLogger.Info().Msg("in-flight")
+	select {
+	case <-sink.started:
+	case <-time.After(time.Second):
+		t.Fatal("expected sink delivery to start")
+	}
+
+	var deliveries sync.WaitGroup
+	for index := 0; index < 32; index++ {
+		deliveries.Add(1)
+		go func(index int) {
+			defer deliveries.Done()
+			appLogger.Info().Int("index", index).Msg("queued")
+		}(index)
+	}
+	flushDone := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		flushDone <- appLogger.FlushSinks(ctx)
+	}()
+
+	deliveriesDone := make(chan struct{})
+	go func() {
+		deliveries.Wait()
+		close(deliveriesDone)
+	}()
+	select {
+	case <-deliveriesDone:
+	case <-time.After(time.Second):
+		t.Fatal("expected concurrent drop-oldest deliveries to complete")
+	}
+	select {
+	case err := <-flushDone:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected deadline-exceeded flush, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected flush to honor its deadline")
+	}
+
+	close(sink.release)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := appLogger.FlushSinks(ctx); err != nil {
+		t.Fatalf("flush released sink: %v", err)
+	}
+}
+
+func TestAppLoggerManagedSinkFailureDoesNotStopLaterSink(t *testing.T) {
+	t.Setenv("APP_LOG_DEDUPE_ENABLED", "false")
+	appLogger := logger.NewAppLogger()
+	if err := appLogger.AddSinkWithOptions(&testManagedSink{err: errors.New("unavailable")}, logger.SinkOptions{}); err != nil {
+		t.Fatalf("add failing sink: %v", err)
+	}
+	later := &testManagedSink{}
+	if err := appLogger.AddSinkWithOptions(later, logger.SinkOptions{}); err != nil {
+		t.Fatalf("add later sink: %v", err)
+	}
+	appLogger.Info().Msg("continues")
+	if entries := later.Entries(); len(entries) != 1 {
+		t.Fatalf("expected later sink delivery, got %#v", entries)
 	}
 }
 

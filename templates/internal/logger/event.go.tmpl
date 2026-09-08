@@ -316,27 +316,18 @@ func (l *AppLogger) emitTypedEntry(output *zerolog.Logger, level zerolog.Level, 
 	if l == nil || output == nil {
 		return
 	}
+	entry = l.redactEntry(entry)
 	sinks := l.snapshotSinks()
 	outputEmit, outputSummary := l.outputDedupeDecision(entry)
 	if outputSummary != nil {
-		if len(sinks) > 0 {
-			ensureLogEntryFields(outputSummary)
-			for _, sink := range sinks {
-				sink(*outputSummary)
-			}
-		}
 		emitOutputEntry(output, level, caller, l.outputEntry(*outputSummary))
-	}
-	if outputEmit && len(sinks) > 0 {
-		ensureLogEntryFields(&entry)
-		for _, sink := range sinks {
-			sink(entry)
-		}
+		deliverSinks(sinks, *outputSummary)
 	}
 	if !outputEmit {
 		return
 	}
 	emitOutputEntry(output, level, caller, l.outputEntry(entry))
+	deliverSinks(sinks, entry)
 }
 
 // outputEntry prepares the console projection without changing sink or JSON fields.
@@ -369,6 +360,7 @@ func (e *Event) buildEntry(msg string) LogEntry {
 		orderedFields: orderedFields,
 		compact:       e.compact,
 		compactValues: append([]string(nil), e.compactValues...),
+		unordered:     e.unordered,
 	}
 }
 
@@ -513,7 +505,9 @@ func (l *AppLogger) HTTPAccess(uri string, status int, method string, latency ti
 		return
 	}
 
-	orderedFields := make([]eventField, 0, 5+len(l.contextFields)+1)
+	uri, _ = redactLogMessageValue(l.redaction, uri)
+	contextFields := redactEventFields(l.redaction, l.contextFields)
+	orderedFields := make([]eventField, 0, 5+len(contextFields)+1)
 	orderedFields = append(orderedFields,
 		eventField{key: "uri", value: uri},
 		eventField{key: "method", value: method},
@@ -527,19 +521,21 @@ func (l *AppLogger) HTTPAccess(uri string, status int, method string, latency ti
 	}
 	orderedFields[4].value = clientIP
 	if err != nil {
-		orderedFields = append(orderedFields, eventField{key: "error", value: err.Error()})
+		errorMessage, _ := redactLogMessageValue(l.redaction, err.Error())
+		orderedFields = append(orderedFields, eventField{key: "error", value: errorMessage})
 	}
-	if len(l.contextFields) > 0 {
-		orderedFields = append(orderedFields, l.contextFields...)
+	if len(contextFields) > 0 {
+		orderedFields = append(orderedFields, contextFields...)
 	}
 
 	entry := LogEntry{
 		Level:         zerolog.InfoLevel.String(),
 		Message:       "HTTP Request",
 		TimeValue:     time.Now(),
-		signature:     buildHTTPAccessSignature(uri, status, method, l.contextFields),
+		signature:     buildHTTPAccessSignature(uri, status, method, contextFields),
 		orderedFields: orderedFields,
 		compact:       true,
+		redacted:      true,
 	}
 	l.emitTypedEntry(l.outputInfoLogger, zerolog.InfoLevel, false, entry)
 }

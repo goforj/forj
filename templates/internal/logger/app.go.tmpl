@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	appruntime "{{.GoModuleName}}/internal/runtime"
-	"{{.GoModuleName}}/internal/inspects"
 	"github.com/goforj/str/v2"
 	"github.com/rs/zerolog"
 	"io"
@@ -17,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"{{.GoModuleName}}/internal/inspects"
+	appruntime "{{.GoModuleName}}/internal/runtime"
 )
 
 // AppLogger represents a debug logger.
@@ -28,10 +28,11 @@ type AppLogger struct {
 	debugLevel        int // The debugLogger level. 1,2,3
 	silent            bool
 	config            logConfig
+	redaction         *redactionPolicy
 	ctx               context.Context
 	contextFields     []eventField
 	sinkMu            sync.RWMutex
-	sinks             []LogSink
+	sinks             []sinkRegistration
 	outputDedupe      *sinkDedupe
 	sinkDedupe        *sinkDedupe
 }
@@ -45,11 +46,12 @@ type logConfig struct {
 	commandOrigin string
 	showTime      bool
 	showCaller    bool
+	redaction     *redactionPolicy
 }
 
 const (
-	logFormatEnv   = "APP_LOG_FORMAT"
-	logFormatJSON  = "json"
+	logFormatEnv      = "APP_LOG_FORMAT"
+	logFormatJSON     = "json"
 	consoleMetaKey    = "__forj_console_meta"
 	consoleCompactKey = "__forj_console_compact"
 )
@@ -65,6 +67,8 @@ type LogEntry struct {
 	orderedFields []eventField
 	compact       bool
 	compactValues []string
+	unordered     bool
+	redacted      bool
 }
 
 func logEntryTimestamp(entry LogEntry) string {
@@ -119,6 +123,7 @@ func newAppLoggerWithWriters(config logConfig, debugLevel int, outputWriter io.W
 	appLogger := &AppLogger{
 		debugLevel:   debugLevel,
 		config:       config,
+		redaction:    config.redaction,
 		outputDedupe: newSinkDedupe(),
 		sinkDedupe:   newSinkDedupe(),
 	}
@@ -147,6 +152,7 @@ func NewSilentLogger() *AppLogger {
 		debugLevel:        0,
 		silent:            true,
 		config:            logConfig{},
+		redaction:         defaultRedactionPolicy(),
 		outputDedupe:      newSinkDedupe(),
 		sinkDedupe:        newSinkDedupe(),
 	}
@@ -179,6 +185,7 @@ func loadLogConfig() logConfig {
 		commandOrigin: strings.TrimSpace(os.Getenv("FORJ_COMMAND_ORIGIN")),
 		showTime:      envFlagEnabled("APP_LOG_TIME"),
 		showCaller:    envFlagEnabled("APP_LOG_CALLER"),
+		redaction:     loadRedactionPolicy(),
 	}
 }
 
@@ -610,11 +617,12 @@ func (l *AppLogger) clone() *AppLogger {
 	if l.silent {
 		clone := NewSilentLogger()
 		clone.ctx = l.ctx
+		clone.redaction = l.redaction
 		if len(l.contextFields) > 0 {
 			clone.contextFields = cloneEventFieldSlice(l.contextFields, 0)
 		}
 		l.sinkMu.RLock()
-		clone.sinks = append([]LogSink(nil), l.sinks...)
+		clone.sinks = append([]sinkRegistration(nil), l.sinks...)
 		l.sinkMu.RUnlock()
 		return clone
 	}
@@ -626,13 +634,14 @@ func (l *AppLogger) clone() *AppLogger {
 		debugLevel:        l.debugLevel,
 		silent:            l.silent,
 		config:            l.config,
+		redaction:         l.redaction,
 		ctx:               l.ctx,
 		contextFields:     cloneEventFieldSlice(l.contextFields, 0),
 		outputDedupe:      l.outputDedupe,
 		sinkDedupe:        l.sinkDedupe,
 	}
 	l.sinkMu.RLock()
-	clone.sinks = append([]LogSink(nil), l.sinks...)
+	clone.sinks = append([]sinkRegistration(nil), l.sinks...)
 	l.sinkMu.RUnlock()
 	return clone
 }
@@ -702,7 +711,46 @@ func (l *AppLogger) AddSink(sink LogSink) {
 	}
 	l.sinkMu.Lock()
 	defer l.sinkMu.Unlock()
-	l.sinks = append(l.sinks, sink)
+	l.sinks = append(l.sinks, callbackSink{sink: sink})
+}
+
+// AddSinkWithOptions registers an error-reporting sink without changing AddSink callback semantics.
+func (l *AppLogger) AddSinkWithOptions(sink Sink, options SinkOptions) error {
+	if sink == nil {
+		return fmt.Errorf("logger sink is required")
+	}
+	registration := sinkRegistration(managedSink{name: strings.TrimSpace(options.Name), sink: sink})
+	if options.Async {
+		if options.QueueCapacity <= 0 {
+			return fmt.Errorf("logger async sink queue capacity must be positive")
+		}
+		overflow := options.Overflow
+		if overflow == "" {
+			overflow = SinkOverflowDropNewest
+		}
+		if overflow != SinkOverflowBlock && overflow != SinkOverflowDropNewest && overflow != SinkOverflowDropOldest {
+			return fmt.Errorf("logger async sink overflow policy %q is invalid", overflow)
+		}
+		registration = newAsyncSink(strings.TrimSpace(options.Name), sink, options.QueueCapacity, overflow)
+	}
+	l.sinkMu.Lock()
+	defer l.sinkMu.Unlock()
+	l.sinks = append(l.sinks, registration)
+	return nil
+}
+
+// FlushSinks flushes asynchronous or closable sinks within ctx and stops async sinks from accepting new entries.
+func (l *AppLogger) FlushSinks(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	sinks := l.snapshotSinks()
+	for _, sink := range sinks {
+		if err := sink.flush(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddHook attaches a zerolog hook to the logger output.
@@ -737,7 +785,7 @@ func (l *AppLogger) outputDedupeDecision(entry LogEntry) (bool, *LogEntry) {
 //
 // The fluent event path shares one dedupe decision between output and sinks so
 // sinks do not pay a second full dedupe pass for the same entry.
-func (l *AppLogger) snapshotSinks() []LogSink {
+func (l *AppLogger) snapshotSinks() []sinkRegistration {
 	if l == nil {
 		return nil
 	}
@@ -746,7 +794,22 @@ func (l *AppLogger) snapshotSinks() []LogSink {
 	if len(l.sinks) == 0 {
 		return nil
 	}
-	return append([]LogSink(nil), l.sinks...)
+	return append([]sinkRegistration(nil), l.sinks...)
+}
+
+// deliverSinks sends isolated entry snapshots in registration order.
+func deliverSinks(sinks []sinkRegistration, entry LogEntry) {
+	if len(sinks) == 0 {
+		return
+	}
+	ensureLogEntryFields(&entry)
+	if len(sinks) == 1 && !sinks[0].retainsEntry() {
+		sinks[0].deliver(entry)
+		return
+	}
+	for _, sink := range sinks {
+		sink.deliver(cloneLogEntry(entry))
+	}
 }
 
 type structuredLogLevelWriter struct {
@@ -845,36 +908,27 @@ func (w *structuredLogLevelWriter) WriteLevel(level zerolog.Level, p []byte) (in
 	if !ok {
 		return w.writeLevel(level, p)
 	}
+	entry = w.logger.redactEntry(entry)
 	outputEmit, outputSummary := w.dedupe.filter(entry)
+	sinks := w.logger.snapshotSinks()
 	if outputSummary != nil {
 		if encoded := encodeLogEntry(*outputSummary, level); len(encoded) > 0 {
 			_, _ = w.writeLevel(level, encoded)
 		}
+		deliverSinks(sinks, *outputSummary)
 	}
-
-	sinks := w.logger.snapshotSinks()
-	if len(sinks) > 0 && w.logger != nil && w.logger.sinkDedupe != nil {
-		sinkEmit, sinkSummary := w.logger.sinkDedupe.filter(entry)
-		if sinkSummary != nil {
-			for _, sink := range sinks {
-				sink(*sinkSummary)
-			}
-		}
-		if sinkEmit {
-			for _, sink := range sinks {
-				sink(entry)
-			}
-		}
-	} else if len(sinks) > 0 {
-		for _, sink := range sinks {
-			sink(entry)
-		}
-	}
-
 	if !outputEmit {
 		return len(p), nil
 	}
-	return w.writeLevel(level, p)
+	encoded := encodeLogEntry(entry, level)
+	if len(encoded) == 0 {
+		return len(p), nil
+	}
+	if _, err := w.writeLevel(level, encoded); err != nil {
+		return len(p), err
+	}
+	deliverSinks(sinks, entry)
+	return len(p), nil
 }
 
 // writeLevel serializes writes because zerolog permits concurrent events while common output writers, such as bytes.Buffer, do not.
@@ -916,6 +970,7 @@ func (w *structuredDedupeLevelWriter) WriteLevel(level zerolog.Level, p []byte) 
 	if !ok {
 		return w.out.WriteLevel(level, p)
 	}
+	entry = redactLogEntry(entry)
 	emit, summary := w.dedupe.filter(entry)
 	if summary != nil {
 		if encoded := encodeLogEntry(*summary, level); len(encoded) > 0 {
@@ -925,7 +980,11 @@ func (w *structuredDedupeLevelWriter) WriteLevel(level zerolog.Level, p []byte) 
 	if !emit {
 		return len(p), nil
 	}
-	return w.out.WriteLevel(level, p)
+	encoded := encodeLogEntry(entry, level)
+	if len(encoded) == 0 {
+		return len(p), nil
+	}
+	return w.out.WriteLevel(level, encoded)
 }
 
 func (w *structuredDedupeLevelWriter) Write(p []byte) (int, error) {
@@ -936,34 +995,28 @@ func (w *logSinkWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
 	if w == nil || w.logger == nil {
 		return len(p), nil
 	}
-	w.logger.sinkMu.RLock()
-	if len(w.logger.sinks) == 0 {
-		w.logger.sinkMu.RUnlock()
+	sinks := w.logger.snapshotSinks()
+	if len(sinks) == 0 {
 		return len(p), nil
 	}
-	sinks := append([]LogSink(nil), w.logger.sinks...)
-	w.logger.sinkMu.RUnlock()
 
 	entry, ok := parseLogEntryPayload(level, p)
 	if !ok {
 		return len(p), nil
 	}
+	entry = w.logger.redactEntry(entry)
 
 	if w.logger.sinkDedupe != nil {
 		emitEntry, summary := w.logger.sinkDedupe.filter(entry)
 		if summary != nil {
-			for _, sink := range sinks {
-				sink(*summary)
-			}
+			deliverSinks(sinks, *summary)
 		}
 		if !emitEntry {
 			return len(p), nil
 		}
 	}
 
-	for _, sink := range sinks {
-		sink(entry)
-	}
+	deliverSinks(sinks, entry)
 	return len(p), nil
 }
 

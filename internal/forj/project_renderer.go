@@ -581,6 +581,8 @@ func (p *ProjectRenderer) Render(input ComponentRenderInput) error {
 				"internal/logger/dedupe.go.tmpl",
 				"internal/logger/dedupe_test.go.tmpl",
 				"internal/logger/event.go.tmpl",
+				"internal/logger/redaction.go.tmpl",
+				"internal/logger/sink.go.tmpl",
 				"internal/logger/wire.go.tmpl",
 				"internal/inspects/README.md.tmpl",
 				"internal/inspects/manager.go.tmpl",
