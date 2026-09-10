@@ -12,7 +12,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "basecoat-css": "^1.0.2",
     "htmx.org": "^2.0.8",
-    "shadcn": "^4.20.1",
+    "shadcn": "^4.21.0",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
