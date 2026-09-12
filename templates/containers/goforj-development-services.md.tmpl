@@ -3,7 +3,7 @@
 # Development Services
 
 `docker-compose.yml` contains the complete GoForj development-service catalog.
-Every optional service is dormant until its exact Compose profile is enabled.
+Every generated service, including MySQL and PostgreSQL, is dormant until its Compose profile is enabled.
 Change only the owner-controlled `COMPOSE_PROFILES` value in `.env`; enabling or
 disabling an already-rendered service does not require another project render.
 
@@ -21,6 +21,27 @@ Profile names are exact and comma-delimited. A token such as `redis-debug` does
 not enable `redis`. Unknown tokens are preserved so an owner-managed
 `docker-compose.override.yml` can use the same activation workflow.
 
+## Disable All Local Dependencies
+
+Project creation enables profiles for the selected local dependencies, including
+`mysql` or `postgres` for the selected server database. To disable all generated
+Compose services, set:
+
+```env
+COMPOSE_PROFILES=
+```
+
+No rerender is needed. `forj dev` skips generated Compose startup and
+container-specific database readiness and creation work for disabled services.
+Application database settings and auto-migrations still apply; configure an
+external database if the App needs one. Process environment variables override
+`.env`, so clear an exported `COMPOSE_PROFILES` value too if one is set.
+
+To stop containers that are already running, use `forj down` or
+`docker-compose --profile "*" down`. Clearing the profiles alone does not stop
+containers or remove their volumes. Owner-defined unprofiled services and
+custom startup tasks continue to follow the owner's Compose configuration.
+
 ## Resource Providers
 
 These profiles can satisfy a matching local App resource. GoForj enables the
@@ -31,6 +52,8 @@ provider objects such as buckets, queues, or topics.
 
 | Profile | Host endpoints | Container endpoint and App binding | Local defaults |
 | --- | --- | --- | --- |
+| `mysql` | `127.0.0.1:3306` | `mysql:3306`; MariaDB for the selected MySQL database | Credentials from `DB_USERNAME`, `DB_PASSWORD`, and `DB_ROOT_PASSWORD` |
+| `postgres` | `127.0.0.1:5432` | `postgres:5432`; selected PostgreSQL database | Credentials from `DB_USERNAME` and `DB_PASSWORD` |
 | `redis` | `127.0.0.1:6379` after applying the legacy-bind safety setting below | `redis:6379`; shared Redis for Cache, Queue, Events, or Storage | No generated password or ACL |
 | `rustfs` | API `http://127.0.0.1:9000`; console `http://127.0.0.1:9001` | `http://rustfs:9000`; S3 Storage | Access key and secret `rustfsadmin` |
 | `nats` | client `127.0.0.1:4222`; monitoring `http://127.0.0.1:8222` | `nats://goforj:goforj@nats:4222`; NATS Cache, Queue, Events, and NATS JetStream Events | User and password `goforj` |
@@ -110,10 +133,11 @@ rest of the catalog while retaining their established component behavior.
 
 New renders seed these profile tokens when their corresponding components or
 local provider requirements are selected. During the first rerender of an
-older project, GoForj detects exact unprofiled `mailpit`, `victoriametrics`, and
-`grafana` services and appends the matching tokens without removing owner
+older project, GoForj detects exact unprofiled `mysql`, `postgres`, `mailpit`,
+`victoriametrics`, and `grafana` services and appends the matching tokens without removing owner
 profiles. This preserves their previous startup behavior while moving future
-activation into `COMPOSE_PROFILES`.
+activation into `COMPOSE_PROFILES`. After this one-time migration, rerenders
+preserve the owner's selection, including an empty value.
 
 The dev summary and resource registry show Mailpit, VictoriaMetrics, and
 Grafana links only while their exact profiles are active. Credentials are not

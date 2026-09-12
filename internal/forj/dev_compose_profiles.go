@@ -36,6 +36,9 @@ func effectiveDevPreTasksWithLegacy(config *project.Config, useLegacy bool) []pr
 	filtered := make([]project.DevTask, 0, len(tasks)+1)
 	hasComposeTask := false
 	for _, task := range tasks {
+		if service := generatedDevTaskComposeService(task); service != "" && composeServiceDisabled(service) {
+			continue
+		}
 		if strings.TrimSpace(task.Name) != "Run Docker Compose" {
 			filtered = append(filtered, task)
 			continue
@@ -176,6 +179,56 @@ func generatedComposeFileExists() bool {
 
 // composeHasUnprofiledService distinguishes required Compose work from dormant catalog-only definitions.
 func composeHasUnprofiledService(paths ...string) (bool, bool) {
+	services, inspected := composeServiceProfiles(paths...)
+	for _, profiles := range services {
+		if profiles == nil || len(*profiles) == 0 {
+			return true, inspected
+		}
+	}
+	return false, inspected
+}
+
+// composeServiceDisabled suppresses container-specific bootstrap only when the owner's effective profiles clearly exclude it.
+func composeServiceDisabled(name string) bool {
+	if !composeUsesGeneratedDefaultFiles() {
+		return false
+	}
+	selected, _, reliable := composeEnvironmentValue("COMPOSE_PROFILES")
+	if !reliable || exactCSVToken(selected, "*") {
+		return false
+	}
+	services, inspected := composeServiceProfiles("docker-compose.yml", "docker-compose.override.yml")
+	profiles := services[name]
+	if !inspected || profiles == nil || len(*profiles) == 0 {
+		return false
+	}
+	for _, profile := range *profiles {
+		if exactCSVToken(selected, profile) {
+			return false
+		}
+	}
+	return true
+}
+
+// generatedDevTaskComposeService preserves custom tasks while identifying the built-in container bootstrap commands.
+func generatedDevTaskComposeService(task project.DevTask) string {
+	if !isConventionalDevBootstrapTask(task) {
+		return ""
+	}
+	switch normalizeDevComposeExecutable(task.Cmd) {
+	case generatedMySQLDevWaitCommand:
+		return "mysql"
+	case generatedPostgresDevWaitCommand:
+		return "postgres"
+	case "docker-compose up -d --force-recreate grafana-seed", "docker-compose run --rm --no-deps grafana-seed":
+		return "grafana-seed"
+	default:
+		return ""
+	}
+}
+
+// composeServiceProfiles merges profile lists and honors explicit reset/override tags in the default Compose files.
+func composeServiceProfiles(paths ...string) (map[string]*[]string, bool) {
 	inspected := false
 	services := map[string]*[]string{}
 	for _, path := range paths {
@@ -184,34 +237,47 @@ func composeHasUnprofiledService(paths ...string) (bool, bool) {
 			continue
 		}
 		if err != nil {
-			return false, false
+			return nil, false
 		}
 		var model struct {
 			Services map[string]struct {
-				Profiles *[]string `yaml:"profiles"`
+				Profiles yaml.Node `yaml:"profiles"`
 			} `yaml:"services"`
 		}
 		if err := yaml.Unmarshal(source, &model); err != nil || model.Services == nil {
-			return false, false
+			return nil, false
 		}
 		inspected = true
 		for name, service := range model.Services {
-			if _, exists := services[name]; !exists || service.Profiles != nil {
-				services[name] = service.Profiles
+			previous, exists := services[name]
+			if service.Profiles.Kind == 0 {
+				if !exists {
+					services[name] = nil
+				}
+				continue
 			}
+			profiles := []string{}
+			if service.Profiles.Tag != "!reset" {
+				if service.Profiles.Kind != yaml.SequenceNode ||
+					(service.Profiles.Tag != "!!seq" && service.Profiles.Tag != "!override") {
+					return nil, false
+				}
+				if err := service.Profiles.Decode(&profiles); err != nil {
+					return nil, false
+				}
+				if previous != nil && service.Profiles.Tag != "!override" {
+					profiles = append(append([]string(nil), (*previous)...), profiles...)
+				}
+			}
+			services[name] = &profiles
 		}
 	}
-	for _, profiles := range services {
-		if profiles == nil || len(*profiles) == 0 {
-			return true, true
-		}
-	}
-	return false, inspected
+	return services, inspected
 }
 
 // isGeneratedDockerComposeUpTask limits runtime suppression to GoForj's conventional command.
 func isGeneratedDockerComposeUpTask(task project.DevTask) bool {
-	return strings.TrimSpace(task.Name) == "Run Docker Compose" && strings.TrimSpace(task.Cmd) == dockerComposeUpDevCommand(project.Components{})
+	return strings.TrimSpace(task.Name) == "Run Docker Compose" && isConventionalDevComposeUpCommand(task.Cmd)
 }
 
 // hasDockerComposeDownTask preserves an owner-customized teardown task with the conventional generated identity.

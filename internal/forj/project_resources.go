@@ -175,6 +175,8 @@ func (p *ProjectRenderer) prepareResourceEnvironment() error {
 			service string
 			profile string
 		}{
+			{service: "mysql", profile: "mysql"},
+			{service: "postgres", profile: "postgres"},
 			{service: "mailpit", profile: "mailpit"},
 			{service: "victoriametrics", profile: "victoriametrics"},
 			{service: "grafana", profile: "grafana"},
@@ -494,6 +496,17 @@ func activeDevelopmentServiceProfiles(servicePlan project.ServicePlan, component
 		}
 		if enabled {
 			profiles = append(profiles, definition.Profile)
+		}
+	}
+	for _, database := range []struct {
+		service project.ServiceKey
+		profile string
+	}{
+		{service: project.ServiceMySQL, profile: "mysql"},
+		{service: project.ServicePostgres, profile: "postgres"},
+	} {
+		if servicePlanHasActiveLocalRequirement(servicePlan, database.service) {
+			profiles = append(profiles, database.profile)
 		}
 	}
 	return strings.Join(profiles, ",")
