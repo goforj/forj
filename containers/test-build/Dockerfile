@@ -5,8 +5,8 @@ ARG GO_VERSION=1.26.6
 ARG GO_AMD64_SHA256=708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89
 ARG GO_ARM64_SHA256=d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e
 
-# Install base deps + Docker Engine dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Apply security fixes to inherited packages before adding Docker Engine dependencies.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
