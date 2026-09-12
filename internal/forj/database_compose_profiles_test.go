@@ -158,6 +158,7 @@ func TestComposeServiceDisabledHonorsOwnerConfiguration(t *testing.T) {
 		{name: "merged profiles retain base", profiles: "mysql", override: "services:\n  mysql:\n    profiles: [owner]\n"},
 		{name: "empty list retains base", override: "services:\n  mysql:\n    profiles: []\n", want: true},
 		{name: "explicit replacement", profiles: "mysql", override: "services:\n  mysql:\n    profiles: !override [owner]\n", want: true},
+		{name: "interpolated service profile", profiles: "mysql", override: "services:\n  mysql:\n    profiles: !override ['${DATABASE_PROFILE}']\n"},
 		{name: "invalid profile type", override: "services:\n  mysql:\n    profiles: owner\n"},
 		{name: "invalid profile item", override: "services:\n  mysql:\n    profiles: [{}]\n"},
 		{name: "unknown profile tag", override: "services:\n  mysql:\n    profiles: !unknown [owner]\n"},

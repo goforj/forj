@@ -203,7 +203,7 @@ func composeServiceDisabled(name string) bool {
 		return false
 	}
 	for _, profile := range *profiles {
-		if exactCSVToken(selected, profile) {
+		if strings.Contains(profile, "$") || exactCSVToken(selected, profile) {
 			return false
 		}
 	}
