@@ -441,6 +441,8 @@ For public Get and the read-only Set preflight, an api.ErrSecretNotFound match o
 
 Contract tests include wrapped api.ErrSecretNotFound without api.ResponseError from Get and GetMetadata, idempotent Delete of an absent binding resource, absent data with owned metadata that still requires DeleteMetadata, and the same sentinel after Put or DeleteMetadata that must remain ErrIndeterminate. An HTTP fixture exercises the actual SDK's 404 translation rather than only interface fakes. Live tests begin with a soft-deleted owned latest version and verify that Delete removes its metadata and all versions; a separate unmarked shared-document fixture verifies refusal without destructive I/O.
 
+Size-limit tests distinguish a value over MaxValueBytes, which returns ErrInvalid without any client call, from a value within that cap rejected by a lower server limit after Put may have dispatched, which matches ErrIndeterminate and not ErrUnavailable. An oversized Get response remains ErrUnavailable. The post-Put case also covers a client that commits before returning a size rejection from a hidden retry; neither case retains the SDK error or matches its message text.
+
 ### Mounted Files
 
 The module path is `github.com/goforj/secrets/driver/filesecrets`. Its constructor borrows an already opened root:
@@ -451,11 +453,15 @@ const MaxFileBytes = 1 << 20
 func New(root *os.Root, bindings map[string]string) (*Reader, error)
 ```
 
-The file driver requires Go 1.25.12 or newer because it depends on the patched os.Root confinement behavior. The root remains caller-owned. Locators contain at most 4,096 bytes and must be nonempty relative slash-separated paths without NUL, backslash, empty, dot, or dot-dot components and without a trailing slash. Contained symlinks remain allowed for Kubernetes projected-volume layouts; os.Root rejects escapes. Bind mounts created by a privileged actor inside the root are outside the threat model.
+The file driver requires the os.Root confinement fix in GO-2026-4970. Its supported toolchains are Go 1.25.12 or later patches in the 1.25 branch, Go 1.26.5 or later patches in the 1.26 branch, and stable Go 1.27 or later releases. Go 1.26.0 through 1.26.4 are explicitly unsupported even though they satisfy a go.mod minimum of 1.25.12; prerelease toolchains are outside this support policy.
+
+The root remains caller-owned. Locators contain at most 4,096 bytes and must be nonempty relative slash-separated paths without NUL, backslash, empty, dot, or dot-dot components and without a trailing slash. Contained symlinks remain allowed for Kubernetes projected-volume layouts; os.Root rejects escapes. Bind mounts created by a privileged actor inside the root are outside the threat model.
 
 For each read on Unix, a platform helper calls root.OpenFile once with read-only and nonblocking flags. It then stats that same descriptor, rejects anything that is not a regular file, reads through a MaxFileBytes plus one limit, and closes the descriptor. Nonblocking open prevents an unconnected FIFO from hanging before the type check. The Windows helper performs the same one-descriptor sequence with its ordinary read-only flag because Windows filesystem opens do not have Unix FIFO semantics. The helper never checks one path and opens another.
 
 Directories, FIFOs, sockets, devices, symlink loops, files that grow beyond the limit, and every oversize result are ErrUnavailable. Missing files are ErrNotFound and filesystem permission failures are ErrPermission. It does not trim bytes. An unconnected FIFO test has a strict timeout and must return ErrUnavailable without a writer.
+
+A Unix confinement regression uses the valid locator `entry`, with an in-root symlink `entry -> escape/` and a second in-root symlink `escape` pointing to an outside directory. A slash introduced by symlink resolution bypasses locator-only validation on affected toolchains. The fixture requires the same root.OpenFile call used by the driver to reject the escape without returning a descriptor, then verifies that the Reader returns an error and no value. Checking only the Reader's final error would miss a vulnerable open that succeeds and is later rejected by the regular-file check. CI runs this regression on Go 1.25.12, Go 1.26.5, and the current supported stable release on Linux and macOS, alongside the contained-symlink success cases.
 
 V1 supports Linux, macOS, and Windows. New operating systems require the same confinement suite before support is enabled; New returns ErrInvalid on an unsupported target. This deliberately excludes js, where os.Root documents incomplete escape protection, and platforms whose rename semantics have not been validated. Linux integration coverage includes Docker and Kubernetes layouts.
 
@@ -469,7 +475,7 @@ V1 supports Linux, macOS, and Windows. New operating systems require the same co
 | Vault KV v2 | Store | Latest version only | Valid UTF-8 in fixed `value` field; 1 MiB Get and Set library cap, subject to lower server limits | All versions and metadata irreversibly deleted after ownership proof |
 | Mounted file | Reader | Contents at read time | Arbitrary bytes; 1 MiB Get cap | Not supported by interface |
 
-The cross-provider fidelity guarantee is capability-aware: every successful driver operation preserves exactly the values accepted by its documented driver contract. The library does not claim that every provider or driver can accept every value shape or size. The Vault cap is a library-side resource bound, not a promise that every Vault storage backend accepts a request of that size; a lower server limit is ErrUnavailable. Callers that require portable writes validate against the intersection of their selected deployment drivers: nonempty valid UTF-8 of at most 25,000 bytes for the initial managed set.
+The cross-provider fidelity guarantee is capability-aware: every successful driver operation preserves exactly the values accepted by its documented driver contract. The library does not claim that every provider or driver can accept every value shape or size. The Vault cap is a library-side resource bound, not a promise that every Vault storage backend accepts a request of that size. A Set value above the library cap is ErrInvalid before provider I/O; a lower server limit reported after Put may have dispatched is ErrIndeterminate under the same mutation rule as every other post-Put error. An oversized read response is ErrUnavailable. Callers that require portable writes validate against the intersection of their selected deployment drivers: nonempty valid UTF-8 of at most 25,000 bytes for the initial managed set.
 
 Vault authentication remains externally managed in v1. The driver operates on owned KV v2 paths below the configured client mount but does not own login, token renewal, or reauthentication.
 
@@ -553,7 +559,7 @@ Before publishing each module tag, release automation packages the exact candida
 
 For every preview and published consumer, automation inspects `go list -m -json all` and rejects any nonnil Replace field or module Dir resolved into the repository checkout. It asserts the expected candidate or released module version and, for secretstest or a driver, the selected published root version. After publishing each tag, a new consumer and fresh module cache download that exact version through the normal module proxy with checksum verification enabled, repeat the consumer tests and `go mod verify`, and compare the downloaded module checksums with the candidate archive. Each tag must point to the tested commit, and each nested module must be verified independently. Repository-local replacements remain available for development; release evidence comes from consumers that do not use them.
 
-The root, secretstest, and network-driver modules initially use Go 1.24.4, matching the established GoForj driver baseline, unless an SDK's minimum version is higher when implementation begins. The file driver alone starts at Go 1.25.12 for the patched os.Root behavior. A driver dependency cannot raise the root module's Go version. Any later minimum-version increase is scoped and documented per module.
+The root, secretstest, and network-driver modules initially use Go 1.24.4, matching the established GoForj driver baseline, unless an SDK's minimum version is higher when implementation begins. The file driver's go.mod minimum remains Go 1.25.12, with the per-branch patched toolchain requirements specified under Mounted Files. A go directive cannot exclude affected patches of a higher Go release, so package documentation and release instructions must state that support policy explicitly and file-driver CI must exercise its confinement regression at each specified patched branch minimum. A driver dependency cannot raise the root module's Go version. Any later minimum-version increase is scoped and documented per module.
 
 ## Compatibility
 
@@ -602,8 +608,9 @@ Add caching, retries, richer errors, metadata, dynamic version selection, purge,
 9. GoForj requires no component, render configuration, generated accessor, template, or special integration.
 10. The design makes no zeroization, purge, recovery, automatic rotation, atomic mutation, or exactly-once claim.
 11. Each constructor, provider request, success shape, current-value rule, Set sequence, Delete behavior, error mapping, retry owner, lifecycle owner, and module release path is specified without requiring implementation-time API invention.
-12. Provider tests distinguish read/preflight error classifications from post-dispatch mutation uncertainty, including AWS InvalidRequestException and Vault api.ErrSecretNotFound.
+12. Provider tests distinguish read/preflight error classifications from post-dispatch mutation uncertainty, including AWS InvalidRequestException, Vault api.ErrSecretNotFound, and local, read-response, and post-Put size-limit failures.
 13. Every module passes candidate-archive consumer checks before tagging and published-module consumer checks afterward, with the expected versions, published checksum verification, no replacement modules, and no repository checkout resolution.
+14. Mounted-file support documents patched toolchains per Go release branch, and its confinement regression verifies rejection during open even when a valid locator resolves through a symlink target ending in a slash.
 
 ## References
 
