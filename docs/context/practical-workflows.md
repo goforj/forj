@@ -20,6 +20,17 @@ GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache go test ./internal/apiindex -cou
 GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache go test ./internal/build -count=1
 ```
 
+## Renaming A Project Module
+
+From a generated project's root:
+
+```bash
+forj project:rename-module
+forj build
+```
+
+The command shows the current module, prompts for the new path, and asks for confirmation before making changes. Use `--dry-run` to preview the affected files. It updates `.goforj.yml`, the root `go.mod` declaration, Go imports and module-qualified string literals, and templ imports across all Apps. See [Rename A Project's Go Module](../project-module-rename.md) for rewrite boundaries and nested-module handling.
+
 ## Changing `console`
 
 Typical loop:

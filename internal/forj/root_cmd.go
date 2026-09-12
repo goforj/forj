@@ -28,6 +28,7 @@ type RootCmd struct {
 	AtlasEvalCmd              atlas.EvalCmd                   `cmd:""`
 	MakeAppCmd                makeapp.Cmd                     `cmd:""`
 	ProjectDescribeCmd        ProjectDescribeCmd              `cmd:""`
+	ProjectRenameModuleCmd    ProjectRenameModuleCmd          `cmd:""`
 	DevCmd                    DevCmd                          `cmd:""`
 	DevStatusCmd              DevStatusCmd                    `cmd:""`
 	DownCmd                   DownCmd                         `cmd:""`
@@ -84,6 +85,7 @@ func NewRootCmd(
 		AtlasEvalCmd:              atlasCommands.eval,
 		MakeAppCmd:                authoring.makeApp,
 		ProjectDescribeCmd:        ProjectDescribeCmd{},
+		ProjectRenameModuleCmd:    ProjectRenameModuleCmd{},
 		DevCmd:                    runtime.dev,
 		DevStatusCmd:              runtime.devStatus,
 		DownCmd:                   runtime.down,

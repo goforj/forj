@@ -179,7 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 6
       matrix:
         shard: [0, 1, 2, 3, 4, 5]
     env:
@@ -195,6 +195,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: set up go
+        id: setup-go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -206,8 +207,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('go.sum', 'internal/coredeps/modules.go', 'scripts/generate-renderwarm.sh', 'templates/**/*.go.tmpl', 'templates/embed.go', 'tools/renderwarm/go.mod', 'tools/renderwarm/main.go') }}
+          key: go-${{ runner.os }}-${{ steps.setup-go.outputs.go-version }}-${{ env.WIRE_INSTALL_TARGET }}-${{ hashFiles('go.mod', 'go.sum', 'internal/coredeps/modules.go', 'scripts/generate-renderwarm.sh', 'templates/**/*.go.tmpl', 'templates/embed.go', 'tools/renderwarm/go.mod', 'tools/renderwarm/go.sum', 'tools/renderwarm/main.go') }}
           restore-keys: |
+            go-${{ runner.os }}-${{ steps.setup-go.outputs.go-version }}-${{ env.WIRE_INSTALL_TARGET }}-
             go-${{ runner.os }}-${{ env.GO_VERSION }}-
 
       - name: install wire
@@ -226,25 +228,33 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: set up go
+        id: setup-go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
 
       - name: cache go modules/build (renders seed)
+        id: render-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('go.sum', 'internal/coredeps/modules.go', 'scripts/generate-renderwarm.sh', 'templates/**/*.go.tmpl', 'templates/embed.go', 'tools/renderwarm/go.mod', 'tools/renderwarm/main.go') }}
+          key: go-${{ runner.os }}-${{ steps.setup-go.outputs.go-version }}-${{ env.WIRE_INSTALL_TARGET }}-${{ hashFiles('go.mod', 'go.sum', 'internal/coredeps/modules.go', 'scripts/generate-renderwarm.sh', 'templates/**/*.go.tmpl', 'templates/embed.go', 'tools/renderwarm/go.mod', 'tools/renderwarm/go.sum', 'tools/renderwarm/main.go') }}
           restore-keys: |
+            go-${{ runner.os }}-${{ steps.setup-go.outputs.go-version }}-${{ env.WIRE_INSTALL_TARGET }}-
             go-${{ runner.os }}-${{ env.GO_VERSION }}-
 
-      - name: seed go caches
+      - name: verify renderwarm generation
         run: |
           bash scripts/generate-renderwarm.sh
           git diff --exit-code -- tools/renderwarm/go.mod tools/renderwarm/go.sum tools/renderwarm/main.go
+
+      # Exact cache hits are immutable, so rebuilding them cannot help the shards.
+      - name: seed go caches
+        if: steps.render-cache.outputs.cache-hit != 'true'
+        run: |
           go mod download
           go install "$WIRE_INSTALL_TARGET"
           go install ./cmd/forj
@@ -258,7 +268,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 5
       matrix:
         include:
           - name: framework 1/6
