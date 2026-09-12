@@ -148,8 +148,8 @@ func TestDeveloperServiceCatalogMatchesRenderedSurfaces(t *testing.T) {
 	environment, compose := renderResourceTemplates(t, components, plan, project.LocalServiceIntent{})
 
 	definitions := devservices.Catalog()
-	profiles := make([]string, 0, len(definitions))
-	knownProfiles := make(map[string]struct{}, len(definitions))
+	profiles := []string{"mysql"}
+	knownProfiles := map[string]struct{}{"mysql": {}}
 	for _, definition := range definitions {
 		profiles = append(profiles, definition.Profile)
 		knownProfiles[definition.Profile] = struct{}{}
@@ -164,7 +164,7 @@ func TestDeveloperServiceCatalogMatchesRenderedSurfaces(t *testing.T) {
 		t.Fatalf("development-service advertisement = %#v, want catalog order %#v:\n%s", advertisedProfiles, profiles, environment)
 	}
 	activeProfiles, set := envfile.Lookup(strings.Split(environment, "\n"), "COMPOSE_PROFILES")
-	if want := "mailpit,victoriametrics,grafana"; !set || activeProfiles != want {
+	if want := "mailpit,victoriametrics,grafana,mysql"; !set || activeProfiles != want {
 		t.Fatalf("default COMPOSE_PROFILES = %q, set=%t; want compatibility defaults %q", activeProfiles, set, want)
 	}
 
@@ -187,6 +187,7 @@ func TestDeveloperServiceCatalogMatchesRenderedSurfaces(t *testing.T) {
 	}
 
 	wantOwners := map[string][]string{
+		"mysql":           {"mysql"},
 		"redis":           {"redis"},
 		"rustfs":          {"rustfs"},
 		"opensearch":      {"opensearch", "opensearch-dashboards"},
@@ -211,19 +212,19 @@ func TestDeveloperServiceCatalogMatchesRenderedSurfaces(t *testing.T) {
 		"victoriametrics": {"victoriametrics", "vmagent"},
 		"grafana":         {"grafana", "grafana-seed", "victoriametrics", "vmagent"},
 	}
-	for _, definition := range definitions {
-		got := ownersByProfile[definition.Profile]
+	for _, profile := range profiles {
+		got := ownersByProfile[profile]
 		slices.Sort(got)
-		want, ok := wantOwners[definition.Profile]
+		want, ok := wantOwners[profile]
 		if !ok {
-			t.Fatalf("catalog profile %q has no asserted Compose ownership", definition.Profile)
+			t.Fatalf("profile %q has no asserted Compose ownership", profile)
 		}
 		if !slices.Equal(got, want) {
-			t.Fatalf("Compose owners for profile %q = %#v, want %#v", definition.Profile, got, want)
+			t.Fatalf("Compose owners for profile %q = %#v, want %#v", profile, got, want)
 		}
 	}
-	if len(ownersByProfile) != len(definitions) {
-		t.Fatalf("rendered profile count = %d, catalog count = %d: %#v", len(ownersByProfile), len(definitions), ownersByProfile)
+	if len(ownersByProfile) != len(profiles) {
+		t.Fatalf("rendered profile count = %d, advertised count = %d: %#v", len(ownersByProfile), len(profiles), ownersByProfile)
 	}
 }
 
@@ -242,7 +243,7 @@ func TestDeveloperServiceDefaultHostPortsDoNotCollide(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(compose), &document); err != nil {
 		t.Fatalf("decode rendered Compose: %v\n%s", err, compose)
 	}
-	defaultHostPort := regexp.MustCompile(`:-([0-9]+)}:[0-9]+(?:/(?:tcp|udp))?$`)
+	defaultHostPort := regexp.MustCompile(`:-([0-9]+)}+:[0-9]+(?:/(?:tcp|udp))?$`)
 	owners := map[string]string{}
 	for serviceName, service := range document.Services {
 		if len(service.Profiles) == 0 {

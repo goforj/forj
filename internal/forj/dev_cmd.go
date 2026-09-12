@@ -569,7 +569,7 @@ type devDatabase struct {
 	Name   string
 }
 
-// devDatabasesForApps discovers every server database the current dev session must create.
+// devDatabasesForApps discovers server databases whose Compose services participate in the current dev session.
 func devDatabasesForApps(config *project.Config, apps []project.App) ([]devDatabase, error) {
 	seen := map[string]bool{}
 	databases := make([]devDatabase, 0, len(apps))
@@ -583,7 +583,7 @@ func devDatabasesForApps(config *project.Config, apps []project.App) ([]devDatab
 		if driver == "" {
 			driver = normalizeDevDatabaseDriver(components.DatabaseDriver())
 		}
-		if driver == "" || driver == "sqlite" {
+		if driver == "" || driver == "sqlite" || composeServiceDisabled(driver) {
 			continue
 		}
 		name := appScopedEnvValue(app, "DB_DATABASE")

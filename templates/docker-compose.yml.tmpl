@@ -21,6 +21,7 @@ services:
 
 {{- if .Resources.DatabaseMySQL }}
   mysql:
+    profiles: [mysql]
     restart: unless-stopped
     build:
       context: ./containers/mariadb
@@ -50,6 +51,7 @@ services:
 
 {{- if .Resources.DatabasePostgres }}
   postgres:
+    profiles: [postgres]
     restart: unless-stopped
     image: postgres:16
     ports:
