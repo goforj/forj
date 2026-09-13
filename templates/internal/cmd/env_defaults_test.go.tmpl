@@ -568,3 +568,33 @@ func printEnvDefaultsOutput(keys ...string) {
 		fmt.Printf("%s=%s\n", key, os.Getenv(key))
 	}
 }
+
+// TestCompiledStackDefaultsPreserveValuesAndRuntimeOverrides exercises the structured payload independently of dotenv loading.
+func TestCompiledStackDefaultsPreserveValuesAndRuntimeOverrides(t *testing.T) {
+    t.Setenv("STACK_EXPLICIT", "runtime")
+    t.Setenv("STACK_EMPTY", "")
+    unsetTestStackEnv(t, "STACK_LIST")
+    unsetTestStackEnv(t, "STACK_LITERAL")
+    CompiledStackDefaultsBase64 = base64.StdEncoding.EncodeToString([]byte(`{"STACK_EXPLICIT":"baked","STACK_EMPTY":"baked","STACK_LIST":"mysql,redis","STACK_LITERAL":"literal $TOKEN\nsecond line"}`))
+    t.Cleanup(func() { CompiledStackDefaultsBase64 = "" })
+    if err := ApplyCompiledStackDefaults(); err != nil { t.Fatal(err) }
+    for key, want := range map[string]string{"STACK_EXPLICIT":"runtime", "STACK_EMPTY":"", "STACK_LIST":"mysql,redis", "STACK_LITERAL":"literal $TOKEN\nsecond line"} {
+        if got := os.Getenv(key); got != want { t.Errorf("%s = %q, want %q", key, got, want) }
+    }
+}
+
+// TestCompiledStackDefaultsRejectMalformedPayload prevents corrupt binary metadata from being silently ignored.
+func TestCompiledStackDefaultsRejectMalformedPayload(t *testing.T) {
+    t.Cleanup(func() { CompiledStackDefaultsBase64 = "" })
+    for _, payload := range []string{"!", base64.StdEncoding.EncodeToString([]byte(`{"KEY":42}`)), base64.StdEncoding.EncodeToString([]byte(`{`))} {
+        CompiledStackDefaultsBase64 = payload
+        if err := ApplyCompiledStackDefaults(); err == nil { t.Fatal("accepted malformed stack defaults") }
+    }
+}
+
+// unsetTestStackEnv restores the inherited environment after testing an absent key.
+func unsetTestStackEnv(t *testing.T, key string) {
+    t.Helper()
+    t.Setenv(key, "")
+    if err := os.Unsetenv(key); err != nil { t.Fatal(err) }
+}

@@ -335,7 +335,7 @@ func buildFrameworkFlagValueCount(argument string) (int, bool) {
 	case "--timings", "--api-index-strict", "--skip-wire", "--profile", "--help", "-h",
 		"--dev", "--x", "--version":
 		return 0, true
-	case "--env-defaults", "--env-overrides", "--top", "--root":
+	case "--env-defaults", "--env-overrides", "--stack", "--top", "--root":
 		if hasInlineValue {
 			return 0, true
 		}

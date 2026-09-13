@@ -139,6 +139,7 @@ func TestBuildPassthroughBoundarySurvivesKong(t *testing.T) {
 		wantRoot         string
 		wantDev          bool
 		wantEnvOverrides string
+		wantStack        string
 	}{
 		{name: "tags", args: []string{"build", "-tags", "dev"}, wantGoArgs: []string{"-tags", "dev"}},
 		{name: "root flag before build", args: []string{"--dev", "build", "-tags", "dev"}, wantGoArgs: []string{"-tags", "dev"}, wantDev: true},
@@ -153,6 +154,8 @@ func TestBuildPassthroughBoundarySurvivesKong(t *testing.T) {
 		{name: "output", args: []string{"build", "-o", "./bin/app"}, wantGoArgs: []string{"-o", "./bin/app"}},
 		{name: "inline output", args: []string{"build", "-o=./bin/app"}, wantGoArgs: []string{"-o=./bin/app"}},
 		{name: "linker flags", args: []string{"build", "-ldflags", "-X example.com/app.Value=dev"}, wantGoArgs: []string{"-ldflags", "-X example.com/app.Value=dev"}},
+		{name: "stack selection", args: []string{"build", "--stack", "portable"}, wantStack: "portable"},
+		{name: "inline stack selection", args: []string{"build", "--stack=services", "-tags", "dev"}, wantStack: "services", wantGoArgs: []string{"-tags", "dev"}},
 		{name: "environment overrides", args: []string{"build", "--env-overrides", "FEATURE_A=true"}, wantEnvOverrides: "FEATURE_A=true"},
 	}
 	for _, test := range tests {
@@ -181,6 +184,9 @@ func TestBuildPassthroughBoundarySurvivesKong(t *testing.T) {
 			}
 			if test.wantRoot != "" && root.BuildCmd.Root != test.wantRoot {
 				t.Fatalf("root = %q, want %q", root.BuildCmd.Root, test.wantRoot)
+			}
+			if root.BuildCmd.Stack != test.wantStack {
+				t.Fatalf("stack = %q, want %q", root.BuildCmd.Stack, test.wantStack)
 			}
 			if root.BuildCmd.EnvOverrides != test.wantEnvOverrides {
 				t.Fatalf("environment overrides = %q, want %q", root.BuildCmd.EnvOverrides, test.wantEnvOverrides)

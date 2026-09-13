@@ -488,3 +488,32 @@ func TestGenerateProjectFilesSkipsGoModTidyForObservabilityOnlyChanges(t *testin
 		t.Fatalf("tidy calls = %d, want 0", called)
 	}
 }
+
+// TestGenerateProjectFilesUsesExplicitEnvironmentWithoutActivatingIt prevents builds from compiling the active stack instead of the selected definition.
+func TestGenerateProjectFilesUsesExplicitEnvironmentWithoutActivatingIt(t *testing.T) {
+	root := t.TempDir()
+	local := "CACHE_DRIVER=memory\nCACHE_SUPPORTED_DRIVERS=memory\n"
+	for name, content := range map[string]string{".env": local, "go.mod": "module example.org/stack\n\ngo 1.26.0\n"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	selection := GenerationSelection{Cache: true, Environment: map[string]string{"CACHE_DRIVER": "redis", "CACHE_SUPPORTED_DRIVERS": "memory,redis"}}
+	if _, err := generateProjectFiles(root, selection, skipModuleTidy); err != nil {
+		t.Fatal(err)
+	}
+	generated, err := os.ReadFile(filepath.Join(root, "internal", "caches", "manager_gen.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(generated), "/redis") {
+		t.Fatalf("selected driver missing from generated support: %s", generated)
+	}
+	current, err := os.ReadFile(filepath.Join(root, ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(current) != local {
+		t.Fatal("generation activated the selected stack")
+	}
+}
