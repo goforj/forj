@@ -982,3 +982,11 @@ The product promise should be:
 ```text
 Write SQL naturally. GoForj translates the portable schema parts, flags the database-specific parts, and keeps the executed SQL visible.
 ```
+
+## Stack Transitions
+
+[Stacks](../context/stacks.md) provide the configuration boundary for transitions such as MySQL to SQLite to Postgres. A saved Stack identifies the target providers; it does not imply permission to translate SQL, execute migrations, or transfer data.
+
+A future transition workflow should prepare target-dialect migrations, report unsupported or lossy operations, validate the target schema, transfer and verify data explicitly, and only then activate the target configuration. Keep the source Stack and its connection settings available until the transition has been verified. Reverse configuration switching must not imply reverse data synchronization.
+
+The Stack wizard currently previews database driver changes and explains this boundary. The translator remains a separate tooling implementation under this design.

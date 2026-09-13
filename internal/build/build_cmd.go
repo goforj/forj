@@ -3,6 +3,7 @@ package build
 import (
 	"bufio"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/goforj/goforj/internal/apiindex"
 	"github.com/goforj/goforj/internal/compileprofile"
 	"github.com/goforj/goforj/internal/logger"
+	"github.com/goforj/goforj/internal/stacks"
 )
 
 const (
@@ -33,9 +35,12 @@ type Cmd struct {
 	Timings  bool `help:"Print per-step timings for generate, api index, and go build"`
 	SkipWire bool `help:"Skip running wire before build" hidden:""`
 	// APIIndexStrict fails the build when API indexing reports warnings or errors.
-	APIIndexStrict bool   `name:"api-index-strict" help:"Fail when API indexing reports warnings or errors"`
-	EnvDefaults    string `help:"Compile unset-only environment defaults as comma-separated KEY=value pairs"`
-	EnvOverrides   string `help:"Compile forced environment overrides as comma-separated KEY=value pairs"`
+	APIIndexStrict bool `name:"api-index-strict" help:"Fail when API indexing reports warnings or errors"`
+	// Stack selects shareable resource defaults without activating the stack locally.
+	Stack         string `help:"Bake a saved stack into the binary as overridable defaults"`
+	stackDefaults map[string]string
+	EnvDefaults   string `help:"Compile unset-only environment defaults as comma-separated KEY=value pairs"`
+	EnvOverrides  string `help:"Compile forced environment overrides as comma-separated KEY=value pairs"`
 
 	// Profile flags.
 	Profile bool `help:"Profile compile time for this build"`
@@ -66,6 +71,22 @@ func (c *Cmd) Run() error {
 	root, err := resolveProjectRoot(c.Root)
 	if err != nil {
 		return err
+	}
+	c.stackDefaults = nil
+	c.pipeline.stackEnvironment = nil
+	if c.Stack != "" {
+		c.stackDefaults, err = stacks.BuildDefaults(root, c.Stack)
+		if err != nil {
+			return err
+		}
+		source, readErr := os.ReadFile(filepath.Join(root, "internal", "cmd", "env_defaults.go"))
+		if readErr != nil || !strings.Contains(string(source), "var CompiledStackDefaultsBase64 string") {
+			return fmt.Errorf("this project needs refreshed Stack runtime support; run forj render before building --stack")
+		}
+		c.pipeline.stackEnvironment = c.stackDefaults
+		if _, err := c.stackApp(root); err != nil {
+			return err
+		}
 	}
 	if err := c.validateCompiledEnv(root); err != nil {
 		return err
@@ -136,10 +157,28 @@ func (c *Cmd) buildArgs(root string) ([]string, error) {
 	envDefaultsEncoded := c.encodedEnvDefaults()
 	envOverridesEncoded := c.encodedEnvOverrides()
 	modulePath := ""
-	if envDefaultsEncoded != "" || envOverridesEncoded != "" {
+	if envDefaultsEncoded != "" || envOverridesEncoded != "" || len(c.stackDefaults) > 0 {
 		modulePath = c.modulePath(root)
 	}
 	var extraLdflags []string
+	if len(c.stackDefaults) > 0 {
+		app, err := c.stackApp(root)
+		if err != nil {
+			return nil, err
+		}
+		runtimeDefaults, err := stacks.AppDefaults(root, c.stackDefaults, app)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.Marshal(runtimeDefaults)
+		if err != nil {
+			return nil, err
+		}
+		if modulePath == "" {
+			return nil, fmt.Errorf("could not resolve module path for stack defaults")
+		}
+		extraLdflags = append(extraLdflags, fmt.Sprintf("-X %s/internal/cmd.CompiledStackDefaultsBase64=%s", modulePath, base64.StdEncoding.EncodeToString(data)))
+	}
 	if envDefaultsEncoded != "" {
 		extraLdflags = append(extraLdflags, c.envDefaultsLdflags(modulePath, envDefaultsEncoded))
 	}
@@ -174,8 +213,14 @@ func (c *Cmd) buildArgs(root string) ([]string, error) {
 
 // hasGoBuildPackageArg reports whether pass-through go build args already name the package to build.
 func hasGoBuildPackageArg(args []string) bool {
+	return len(goBuildPackages(args)) > 0
+}
+
+// goBuildPackages separates explicit targets from flag values so Stack defaults follow the compiled App.
+func goBuildPackages(args []string) []string {
 	flagsWithValue := map[string]struct{}{
 		"-asmflags": {}, "-buildmode": {}, "-compiler": {}, "-gccgoflags": {}, "-gcflags": {},
+		"-covermode": {}, "-coverpkg": {}, "-pgo": {},
 		"-installsuffix": {}, "-ldflags": {}, "-mod": {}, "-modfile": {},
 		"-o": {}, "-overlay": {}, "-p": {}, "-pkgdir": {}, "-tags": {}, "-toolexec": {},
 	}
@@ -185,7 +230,7 @@ func hasGoBuildPackageArg(args []string) bool {
 			continue
 		}
 		if arg == "--" {
-			return i+1 < len(args)
+			return args[i+1:]
 		}
 		if strings.HasPrefix(arg, "-") {
 			if strings.Contains(arg, "=") {
@@ -201,9 +246,9 @@ func hasGoBuildPackageArg(args []string) bool {
 			}
 			continue
 		}
-		return true
+		return args[i:]
 	}
-	return false
+	return nil
 }
 
 // outputArgIndex centralizes output arg index behavior so callers follow the same contract.

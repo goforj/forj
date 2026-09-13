@@ -329,6 +329,9 @@ func exactScopedChildNames(environment generationEnvironment, prefix string, roo
 		if suffix == "" {
 			continue
 		}
+		if _, root := rootKeyParts[strings.ToUpper(suffix)]; root {
+			continue
+		}
 		parts := strings.Split(strings.ToUpper(suffix), "_")
 		for _, root := range orderedRootKeys {
 			rootParts := rootKeyParts[root]
@@ -339,11 +342,11 @@ func exactScopedChildNames(environment generationEnvironment, prefix string, roo
 			if child == "" {
 				continue
 			}
-			if _, exists := seen[child]; exists {
-				continue
+			if _, exists := seen[child]; !exists {
+				seen[child] = struct{}{}
+				names = append(names, child)
 			}
-			seen[child] = struct{}{}
-			names = append(names, child)
+			// The longest matching key owns the assignment even when another setting already declared its child.
 			break
 		}
 	}

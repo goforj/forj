@@ -335,7 +335,7 @@ func buildFrameworkFlagValueCount(argument string) (int, bool) {
 	case "--timings", "--api-index-strict", "--skip-wire", "--profile", "--help", "-h",
 		"--dev", "--x", "--version":
 		return 0, true
-	case "--env-defaults", "--env-overrides", "--top", "--root":
+	case "--env-defaults", "--env-overrides", "--stack", "--top", "--root":
 		if hasInlineValue {
 			return 0, true
 		}
@@ -362,7 +362,8 @@ func resolveAppPrefix(args []string, inGeneratedApp bool) (string, []string, boo
 		return "", args, false
 	}
 	appName := strings.TrimSpace(args[0])
-	if !project.IsSafeAppName(appName) || isNativeCommandName(appName) {
+	// Stack Apps predate the wizard; stack:configure remains available when that existing route wins.
+	if !project.IsSafeAppName(appName) || (isNativeCommandName(appName) && appName != "stack") {
 		return "", args, false
 	}
 	if regularFileExists(filepath.Join(".", "bin", appName)) {
@@ -445,7 +446,7 @@ func appendConventionalAppHelpApp(apps *[]string, seen map[string]struct{}, appN
 	if appName == "" || !project.IsSafeAppName(appName) || project.IsReservedAppName(appName) {
 		return
 	}
-	if appName != project.DefaultAppName && isNativeCommandName(appName) {
+	if appName != project.DefaultAppName && appName != "stack" && isNativeCommandName(appName) {
 		return
 	}
 	if _, ok := seen[appName]; ok {

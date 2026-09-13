@@ -73,3 +73,52 @@ func resolveDefaultAppPackage(root string) (string, error) {
 	}
 	return ".", nil
 }
+
+// stackApp resolves one conventional App target before embedding App-specific defaults.
+func (c *Cmd) stackApp(root string) (string, error) {
+	if len(c.Args) > 0 {
+		flag, _, _ := strings.Cut(c.Args[0], "=")
+		if flag == "-C" || flag == "--C" {
+			return "", fmt.Errorf("--stack requires --root instead of go build -C so generation and compilation use the same project")
+		}
+	}
+	packages := goBuildPackages(c.Args)
+	if len(packages) == 0 {
+		path, err := resolveDefaultAppPackage(root)
+		if err != nil {
+			return "", err
+		}
+		packages = []string{path}
+	}
+	if len(packages) != 1 {
+		return "", fmt.Errorf("--stack requires a single App package; build each App separately")
+	}
+	config, err := project.LoadProjectConfigAt(root)
+	if err != nil {
+		return "", err
+	}
+	path := packages[0]
+	if module := c.modulePath(root); module != "" {
+		if path == module {
+			path = "."
+		} else if strings.HasPrefix(path, module+"/") {
+			path = "./" + strings.TrimPrefix(path, module+"/")
+		}
+	}
+	if filepath.IsAbs(path) {
+		path, err = filepath.Rel(root, path)
+		if err != nil {
+			return "", fmt.Errorf("resolve Stack App package: %w", err)
+		}
+	}
+	path = filepath.ToSlash(filepath.Clean(path))
+	if path == "." || path == "cmd/app" {
+		return project.DefaultAppName, nil
+	}
+	for name := range config.Apps {
+		if path == filepath.ToSlash(filepath.Dir(project.AppForName(name).Entrypoint)) {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("--stack requires a configured App package such as ./cmd/app; cannot resolve %q", packages[0])
+}

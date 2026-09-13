@@ -466,7 +466,9 @@ func IsReservedAppName(name string) bool {
 // IsNativeFrameworkCommandName reports whether name is owned by the framework CLI.
 func IsNativeFrameworkCommandName(name string) bool {
 	switch strings.TrimSpace(name) {
-	case "build",
+	case "stack",
+		"stack:configure",
+		"build",
 		"backup:create",
 		"backup:list",
 		"backup:plan",
