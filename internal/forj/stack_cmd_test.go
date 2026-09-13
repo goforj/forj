@@ -362,3 +362,45 @@ func TestStackCommandReportsMalformedProjectsAndProfiles(t *testing.T) {
 		})
 	}
 }
+
+// TestStackFilesDoNotTriggerDevEnvironmentRebuilds keeps saving inactive definitions distinct from activating their settings.
+func TestStackFilesDoNotTriggerDevEnvironmentRebuilds(t *testing.T) {
+	root := stackWizardFixture(t)
+	t.Chdir(root)
+	before, err := snapshotDevEnvFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{".env.stack.services", ".env.stack.services.local", ".env.stack-state.local", ".env.stack-lock.local", ".env.stack-tmp-123.local"} {
+		if err := os.WriteFile(name, []byte("DB_DRIVER=postgres\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after, err := snapshotDevEnvFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if devEnvFilesChanged(before, after) {
+		t.Fatal("saving inactive stack triggered an environment rebuild")
+	}
+	if err := os.WriteFile(".env", []byte("DB_DRIVER=sqlite\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	activated, err := snapshotDevEnvFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !devEnvFilesChanged(after, activated) {
+		t.Fatal("activation did not trigger the normal environment rebuild")
+	}
+	if err := os.WriteFile(".env.stack-custom", []byte("DB_DRIVER=postgres\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	custom, err := snapshotDevEnvFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !devEnvFilesChanged(activated, custom) {
+		t.Fatal("unrelated existing runtime layer was suppressed")
+	}
+}

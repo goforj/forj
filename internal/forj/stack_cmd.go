@@ -23,7 +23,7 @@ func (*StackCmd) Signature() string {
 
 // Help explains the boundary between configuration changes and durable application data.
 func (*StackCmd) Help() string {
-	return "Interactively change .env, create reusable .env.stack.<name> definitions, or switch between saved stacks.\nPrivate connection settings and recovery snapshots stay in ignored .local files.\nActivation does not move data, run migrations, stop containers, or restart running Apps. Run forj build after changing drivers."
+	return "Interactively change .env, create reusable .env.stack.<name> definitions, or switch between saved stacks.\nPrivate connection settings and recovery snapshots stay in ignored .local files.\nActivation edits .env. A running dev watcher can rebuild and run configured startup tasks. Stop it before preparing a database transition. Run forj build after changing drivers."
 }
 
 // Run keeps every write behind a preview and explicit confirmation.
@@ -161,7 +161,7 @@ func showStackDrivers(ui *console.Console, s *stacks.Session, values map[string]
 	for _, resource := range s.Resources {
 		driver := values[resource.Key]
 		if driver == "" {
-			driver = resource.Definition.DefaultDriver + " (default)"
+			driver = "(inherited/default)"
 		}
 		ui.Infof("  %s: %s", resource.Key, driver)
 	}
@@ -345,7 +345,8 @@ func activateStack(ui *console.Console, s *stacks.Session, name string, values m
 		}
 	}
 	ui.Infof("Database contents stay in place. Check target-dialect migrations before starting the App; activation does not translate SQL or transfer data.")
-	ui.Infof("Memory and inproc providers are process-local. Existing containers and running Apps are unchanged.")
+	ui.Infof("Memory and inproc providers are process-local. The wizard does not stop existing containers.")
+	ui.Infof("A running forj dev session can react to .env changes and run configured startup tasks. Stop it before preparing a database transition.")
 	saveWorking := s.Active != ""
 	if s.Changed() {
 		choice, err := ui.ChooseIndex("The active stack has manual edits", []string{"Keep edits in its private working copy", "Discard edits when leaving this stack", "Cancel"}, 0)

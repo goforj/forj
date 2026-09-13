@@ -95,8 +95,8 @@ func Open(root string) (*Session, error) {
 
 // ValidateName keeps profile names distinct from private overrides and filesystem paths.
 func ValidateName(name string) error {
-	if !validName.MatchString(name) || name == "local" {
-		return fmt.Errorf("stack name must start with a lowercase letter and contain up to 48 lowercase letters, digits, underscores, or hyphens; local is reserved")
+	if !validName.MatchString(name) {
+		return fmt.Errorf("stack name must start with a lowercase letter and contain up to 48 lowercase letters, digits, underscores, or hyphens")
 	}
 	return nil
 }

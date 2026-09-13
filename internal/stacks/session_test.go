@@ -213,7 +213,7 @@ func TestCommitRollsBackNewAndExistingFiles(t *testing.T) {
 
 // TestValidationAndFileFailures rejects unsafe names, malformed values, and ambiguous filesystem ownership.
 func TestValidationAndFileFailures(t *testing.T) {
-	for _, name := range []string{"", "../secret", "production.local", "UPPER", "local", "a/b", strings.Repeat("a", 49)} {
+	for _, name := range []string{"", "../secret", "production.local", "UPPER", "a/b", strings.Repeat("a", 49)} {
 		if err := ValidateName(name); err == nil {
 			t.Errorf("accepted %q", name)
 		}
@@ -446,5 +446,25 @@ func TestOpenRejectsAnUnsafeActiveName(t *testing.T) {
 	put(t, root, stateName, `{"version":1,"active":"../../outside"}`)
 	if _, err := Open(root); err == nil {
 		t.Fatal("accepted unsafe active name")
+	}
+}
+
+// TestLocalIsAValidStackName keeps conventional local profiles distinct from their private .local override suffix.
+func TestLocalIsAValidStackName(t *testing.T) {
+	root := fixture(t)
+	s := openTest(t, root)
+	if err := s.Save("local", s.Current); err != nil {
+		t.Fatal(err)
+	}
+	fresh := openTest(t, root)
+	names, err := fresh.Names()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 || names[0] != "local" {
+		t.Fatalf("names = %#v", names)
+	}
+	if _, err := fresh.Load("local", true); err != nil {
+		t.Fatal(err)
 	}
 }

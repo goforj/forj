@@ -24,7 +24,7 @@ What would you like to do?
 
 The wizard lists existing stacks and current resource drivers. Creating a stack starts from portable defaults, the current configuration, or an existing stack. The editor uses the resource catalog for driver choices, includes named resources and configured App overrides, and lets owners enter additional connection settings through hidden input. Compose profiles can be edited explicitly, including an empty selection.
 
-Saving and activating are separate confirmations. Saving alone leaves `.env` unchanged. Reusing a name asks before replacing its definition and private settings.
+Saving and activating are separate confirmations. Saving alone leaves `.env` unchanged. The dev environment watcher ignores saved Stack definitions and private metadata, so saving an inactive Stack does not request an environment rebuild. Reusing a name asks before replacing its definition and private settings.
 
 ```text
 .env                         Active private configuration
@@ -107,7 +107,7 @@ Existing projects need `forj render` once to receive the structured Stack runtim
 
 ## Database transitions
 
-Activating a Stack changes configuration only. It does not start or stop containers, restart Apps, translate migrations, create schemas, or transfer data. An empty Compose profile selection prevents automatic dependency startup; use `forj down` to stop existing containers.
+Activating a Stack edits `.env`. The wizard does not directly start or stop containers, restart Apps, translate migrations, create schemas, or transfer data. A running `forj dev` session can react to that edit, rebuild, and run its configured startup tasks. Stop the dev session before preparing a database transition or building a different deployment Stack. An empty Compose profile selection prevents automatic dependency startup; use `forj down` to stop existing containers.
 
 SQLite, MySQL, and Postgres can require different SQL. Memory caches, workerpool queues, and inproc events also have different persistence and process-sharing behavior. Portable configuration cannot prove that custom application SQL or external integrations are portable.
 
