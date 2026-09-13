@@ -269,7 +269,7 @@ func TestIsReservedAppName(t *testing.T) {
 }
 
 func TestIsNativeFrameworkCommandName(t *testing.T) {
-	for _, name := range []string{"build", "dev", "render", "run", "x", "help", "version"} {
+	for _, name := range []string{"build", "dev", "render", "run", "x", "help", "version", "stack", "stack:configure"} {
 		if !IsNativeFrameworkCommandName(name) {
 			t.Fatalf("expected %q to be a native framework command", name)
 		}

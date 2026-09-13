@@ -2,6 +2,7 @@ package stacks
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/goforj/goforj/internal/envfile"
@@ -77,19 +78,24 @@ func resources(root string, config *project.Config, values map[string]string) []
 
 // resourceKey removes only configured App prefixes, preventing unrelated application keys from being claimed.
 func resourceKey(config *project.Config, key string) string {
+	longest := ""
 	for name := range config.Apps {
 		if name == project.DefaultAppName {
 			continue
 		}
 		prefix := project.AppEnvironmentPrefix(name) + "_"
-		if strings.HasPrefix(key, prefix) {
+		if len(prefix) > len(longest) && strings.HasPrefix(key, prefix) {
 			candidate := strings.TrimPrefix(key, prefix)
 			for _, resource := range []string{"DB_", "CACHE_", "QUEUE_", "EVENTS_", "STORAGE_", "MAIL_", "REDIS_"} {
 				if strings.HasPrefix(candidate, resource) {
-					return candidate
+					longest = prefix
+					break
 				}
 			}
 		}
+	}
+	if longest != "" {
+		return strings.TrimPrefix(key, longest)
 	}
 	return key
 }
@@ -179,6 +185,7 @@ func (s *Session) Validate(values map[string]string) error {
 				continue
 			}
 			for _, driver := range strings.Split(value, ",") {
+				driver = strings.TrimSpace(driver)
 				if driver == "" {
 					continue
 				}
@@ -196,19 +203,30 @@ func (s *Session) Validate(values map[string]string) error {
 		if _, ok := resource.Definition.Driver(driver); !ok {
 			return fmt.Errorf("%s selects unsupported driver %q", resource.Key, driver)
 		}
-		supported := values[resource.SupportedKey]
+		supported := strings.TrimSpace(values[resource.SupportedKey])
 		if supported == "" {
 			continue
 		}
-		found := false
+		found := slices.Contains(generate.BaselineDrivers(resource.Definition.Key), driver)
+		count := 0
 		for _, name := range strings.Split(supported, ",") {
 			name = project.CanonicalResourceDriver(resource.Definition.Key, name)
+			if name == "" {
+				continue
+			}
 			if _, ok := resource.Definition.Driver(name); !ok {
 				return fmt.Errorf("%s contains unsupported driver %q", resource.SupportedKey, name)
 			}
+			count++
 			if name == driver {
 				found = true
 			}
+		}
+		if count == 0 {
+			if resource.Definition.Key == project.ResourceDatabase {
+				return fmt.Errorf("%s must include at least one driver", resource.SupportedKey)
+			}
+			continue
 		}
 		if !found {
 			return fmt.Errorf("%s must include %s for %s", resource.SupportedKey, driver, resource.Key)

@@ -77,7 +77,7 @@ CACHE_SUPPORTED_DRIVERS=memory,redis
 COMPOSE_PROFILES=
 ```
 
-Portable database settings clear stale DSNs and assign distinct SQLite paths to named databases and App overrides. Generic database names remain private and unchanged, so selecting MySQL or Postgres later does not reuse a SQLite filepath as the database name. Review the target endpoint and credentials when changing service drivers. Existing supported drivers remain available in the generated build contract. Run `forj build` after activation to regenerate and compile driver support.
+Portable database settings clear stale DSNs and assign distinct SQLite paths to named databases and App overrides. Generic database names remain private and unchanged, so selecting MySQL or Postgres later does not reuse a SQLite filepath as the database name. Review the target endpoint and credentials when changing service drivers. Existing supported drivers remain available in the generated build contract. Baseline local providers remain valid even when omitted from `*_SUPPORTED_DRIVERS`, matching the generator. Named SQLite paths remain settings of their owning database when switching repeatedly. Run `forj build` after activation to regenerate and compile driver support.
 
 Switching back to a saved services stack restores its connection settings. Activation preserves unrelated `.env` text, comments, and multiline values. Before every switch, GoForj saves the previous managed settings privately. Restore previous configuration works even when the previous configuration had no stack name. This stores one previous configuration, not an unlimited history.
 
@@ -105,7 +105,7 @@ The compiled App's defaults are folded into its binary's base configuration keys
 
 An existing services `.env` therefore still selects services when running a portable-default binary from that project directory. Run the binary with the intended deployment configuration. An explicit provider failure does not trigger an automatic switch to SQLite or memory. Runtime driver selections must be among the binary's compiled providers.
 
-Existing projects need `forj render` once to receive the structured Stack runtime helper. Existing `forj build` behavior and explicit project configuration remain unchanged when `--stack` is omitted. `stack` is now a framework command and cannot be used as a new App name.
+Existing projects need `forj render` once to receive the structured Stack runtime helper. Existing `forj build` behavior and explicit project configuration remain unchanged when `--stack` is omitted. `stack` is reserved for new App names. Existing Apps already named `stack` keep their `forj stack ...` route and remain visible in help. In those projects, use `forj stack:configure` to open the Stack wizard; that alias also works in projects without a name collision.
 
 ## Database transitions
 

@@ -157,3 +157,24 @@ func TestAdditionalAppIgnoresDefaultAppPortOverrides(t *testing.T) {
 	}
 }
 {{- end }}
+
+// TestDatabaseDiscoveryKeepsNamedSQLitePathsInTheirOwningConnection prevents portable helpers from creating phantom resources.
+func TestDatabaseDiscoveryKeepsNamedSQLitePathsInTheirOwningConnection(t *testing.T) {
+	t.Setenv("DB_ANALYTICS_SQLITE_DATABASE", "analytics.db")
+	t.Setenv("DB_REPORTING_SQLITE_DRIVER", "sqlite")
+	t.Setenv("DB_REPORTING_SQLITE_SQLITE_DATABASE", "reporting.db")
+	names := map[string]bool{}
+	for _, instance := range DiscoverDatabaseInstances() {
+		names[instance.Name] = true
+	}
+	for _, name := range []string{"analytics", "reporting_sqlite"} {
+		if !names[name] {
+			t.Fatalf("missing %s", name)
+		}
+	}
+	for _, name := range []string{"analytics_sqlite", "reporting_sqlite_sqlite"} {
+		if names[name] {
+			t.Fatalf("phantom database %s", name)
+		}
+	}
+}

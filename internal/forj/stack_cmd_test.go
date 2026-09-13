@@ -474,3 +474,24 @@ func TestStackWizardUnchangedDepartureKeepsDefinitionLive(t *testing.T) {
 		t.Fatal("unchanged departure hid public edits or lost private settings")
 	}
 }
+
+// TestStackConfigureAliasRunsTheWizard keeps configuration accessible when an existing App owns the stack prefix.
+func TestStackConfigureAliasRunsTheWizard(t *testing.T) {
+	root := stackWizardFixture(t)
+	var output bytes.Buffer
+	command := RootCmd{StackCmd: StackCmd{root: root, ui: moduleRenameTestConsole("7\n", &output)}}
+	parser, err := kong.New(&command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context, err := parser.Parse([]string{"stack:configure"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := context.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Project stacks") {
+		t.Fatal("alias did not open wizard")
+	}
+}

@@ -1015,3 +1015,50 @@ func envHasEntry(env []string, want string) bool {
 	}
 	return false
 }
+
+// TestExistingStackAppKeepsItsRouteAndHelp preserves the pre-wizard App name for source and binary distributions.
+func TestExistingStackAppKeepsItsRouteAndHelp(t *testing.T) {
+	for _, kind := range []string{"source", "binary", "absent"} {
+		t.Run(kind, func(t *testing.T) {
+			restore := chdirTemp(t)
+			defer restore()
+			previous := cliNativeCommandNames
+			defer func() { cliNativeCommandNames = previous }()
+			cliNativeCommandNames = []string{"stack", "stack:configure", "build"}
+			if kind == "source" {
+				writeGeneratedAppMarker(t)
+				writeSourceApp(t, "stack")
+			}
+			if kind == "binary" {
+				if err := os.MkdirAll("bin", 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join("bin", "stack"), []byte("binary"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, args := range [][]string{{"stack"}, {"stack", "--help"}, {"stack", "serve"}, {"stack", "build"}} {
+				name, remaining, ok := resolveAppPrefix(args, kind == "source")
+				if ok != (kind != "absent") {
+					t.Fatalf("route=%v for %s", ok, kind)
+				}
+				if ok && (name != "stack" || !reflect.DeepEqual(remaining, args[1:])) {
+					t.Fatal("App arguments changed")
+				}
+			}
+			if _, _, ok := resolveAppPrefix([]string{"stack:configure"}, true); ok {
+				t.Fatal("wizard alias routed to an App")
+			}
+			if kind != "absent" {
+				apps := conventionalAppHelpApps(true)
+				found := false
+				for _, name := range apps {
+					found = found || name == "stack"
+				}
+				if !found {
+					t.Fatal("existing Stack App disappeared from help")
+				}
+			}
+		})
+	}
+}

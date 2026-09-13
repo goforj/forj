@@ -325,8 +325,9 @@ func AppDefaults(root string, values map[string]string, app string) (map[string]
 	if app != "" && app != project.DefaultAppName {
 		prefix := project.AppEnvironmentPrefix(app) + "_"
 		for key, value := range values {
-			if strings.HasPrefix(key, prefix) {
-				result[strings.TrimPrefix(key, prefix)] = value
+			base := resourceKey(config, key)
+			if key == prefix+base {
+				result[base] = value
 			}
 		}
 	}

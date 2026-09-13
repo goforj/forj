@@ -48,6 +48,7 @@ var dbRootKeys = []string{
 	"DSN",
 	"HOST",
 	"DATABASE",
+	"SQLITE_DATABASE",
 	"USERNAME",
 	"PASSWORD",
 	"PORT",
@@ -58,6 +59,9 @@ var dbRootKeys = []string{
 	"CONN_MAX_LIFETIME_MINUTES",
 	"ROOT_PASSWORD",
 }
+
+// dbLocalDrivers are available independently of the optional driver manifest.
+var dbLocalDrivers = []string{"sqlite"}
 
 // GenerateDBFiles writes database accessors whose selectable drivers are fixed by the generation snapshot.
 func GenerateDBFiles(projectDir string) (int, error) {
@@ -147,8 +151,11 @@ func renderDBAccessors(names []string, driverPlan dbDriverPlan) ([]byte, error) 
 // discoverDBDrivers validates every active connection against the explicit build contract before source is emitted.
 func discoverDBDrivers(input generationInput, names []string) (dbDriverPlan, error) {
 	drivers := map[string]dbDriverSpec{}
-	compiled := map[string]struct{}{"sqlite": {}}
-	recordDBDriver(drivers, "sqlite")
+	compiled := map[string]struct{}{}
+	for _, driver := range dbLocalDrivers {
+		compiled[driver] = struct{}{}
+		recordDBDriver(drivers, driver)
+	}
 	rootDriver := str.Of(input.environment.Get("DB_DRIVER", "sqlite")).Trim().ToLower().String()
 	if rootDriver == "" {
 		rootDriver = "sqlite"

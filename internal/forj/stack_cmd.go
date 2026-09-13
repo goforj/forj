@@ -18,7 +18,7 @@ type StackCmd struct {
 
 // Signature registers Stacks as a project authoring command.
 func (*StackCmd) Signature() string {
-	return `name:"stack" help:"Configure resources, save stacks, and switch the project environment"`
+	return `name:"stack" aliases:"stack:configure" help:"Configure resources, save stacks, and switch the project environment"`
 }
 
 // Help explains the boundary between configuration changes and durable application data.
