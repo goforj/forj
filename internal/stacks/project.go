@@ -127,33 +127,24 @@ func SetDriver(values map[string]string, resource Resource, driver string) error
 	}
 	old := values[resource.Key]
 	values[resource.Key] = driver
-	supported := strings.Split(values[resource.SupportedKey], ",")
-	for _, name := range []string{old, driver} {
+	supported := append(strings.Split(values[resource.SupportedKey], ","), old, driver)
+	var normalized []string
+	seen := map[string]bool{}
+	for _, name := range supported {
+		name = project.CanonicalResourceDriver(resource.Definition.Key, name)
 		if name == "" {
 			continue
 		}
-		found := false
-		for _, existing := range supported {
-			if strings.TrimSpace(existing) == name {
-				found = true
-			}
-		}
-		if !found {
-			supported = append(supported, name)
+		if !seen[name] {
+			normalized = append(normalized, name)
+			seen[name] = true
 		}
 	}
-	var nonempty []string
-	for _, name := range supported {
-		if name = strings.TrimSpace(name); name != "" {
-			nonempty = append(nonempty, name)
-		}
-	}
-	values[resource.SupportedKey] = strings.Join(nonempty, ",")
+	values[resource.SupportedKey] = strings.Join(normalized, ",")
 	if resource.Definition.Key == project.ResourceDatabase && driver == "sqlite" {
 		prefix := strings.TrimSuffix(resource.Key, "DRIVER")
 		path := "./_data/stacks/portable/" + strings.ToLower(strings.TrimSuffix(prefix, "_")) + ".db"
 		values[prefix+"DSN"] = ""
-		values[prefix+"DATABASE"] = path
 		values[prefix+"SQLITE_DATABASE"] = path
 	}
 	return nil
@@ -198,7 +189,7 @@ func (s *Session) Validate(values map[string]string) error {
 		}
 	}
 	for _, resource := range resources(s.Root, s.config, values) {
-		driver := values[resource.Key]
+		driver := project.CanonicalResourceDriver(resource.Definition.Key, values[resource.Key])
 		if driver == "" {
 			continue
 		}
@@ -211,7 +202,7 @@ func (s *Session) Validate(values map[string]string) error {
 		}
 		found := false
 		for _, name := range strings.Split(supported, ",") {
-			name = strings.TrimSpace(name)
+			name = project.CanonicalResourceDriver(resource.Definition.Key, name)
 			if _, ok := resource.Definition.Driver(name); !ok {
 				return fmt.Errorf("%s contains unsupported driver %q", resource.SupportedKey, name)
 			}
@@ -235,7 +226,7 @@ func shareable(values map[string]string) map[string]string {
 		}
 	}
 	for key, driver := range values {
-		if driver != "sqlite" || !strings.HasSuffix(key, "_DRIVER") {
+		if project.CanonicalResourceDriver(project.ResourceDatabase, driver) != "sqlite" || !strings.HasSuffix(key, "_DRIVER") {
 			continue
 		}
 		prefix := strings.TrimSuffix(key, "DRIVER")
@@ -243,6 +234,10 @@ func shareable(values map[string]string) map[string]string {
 			continue
 		}
 		for _, suffix := range []string{"DATABASE", "SQLITE_DATABASE"} {
+			// A dedicated SQLite path leaves DATABASE available for private service connection settings.
+			if suffix == "DATABASE" && values[prefix+"SQLITE_DATABASE"] != "" {
+				continue
+			}
 			if value, ok := values[prefix+suffix]; ok {
 				result[prefix+suffix] = value
 			}

@@ -193,7 +193,23 @@ func (s *Session) Save(name string, values map[string]string) error {
 	for key := range public {
 		delete(private, key)
 	}
-	return s.write(map[string][]byte{".env.stack." + name: encodeDocument(public), ".env.stack." + name + ".local": encodeDocument(private)})
+	updates := map[string][]byte{".env.stack." + name: encodeDocument(public), ".env.stack." + name + ".local": encodeDocument(private)}
+	if name == s.Active && equalValues(values, s.Current) {
+		next := s.state
+		next.Applied = clone(values)
+		data, err := json.MarshalIndent(next, "", "  ")
+		if err != nil {
+			return err
+		}
+		updates[stateName] = append(data, '\n')
+	}
+	if err := s.write(updates); err != nil {
+		return err
+	}
+	if name == s.Active && equalValues(values, s.Current) {
+		s.state.Applied = clone(values)
+	}
+	return nil
 }
 
 // Activate preserves the previous configuration and optionally saves the active stack's manual edits privately.
@@ -212,7 +228,7 @@ func (s *Session) Activate(name string, values map[string]string, saveWorking bo
 		return err
 	}
 	updates := map[string][]byte{stateName: append(data, '\n'), ".env": s.env.replace(func(key string) bool { return managedKey(s.config, key) }, values)}
-	if saveWorking && s.Active != "" {
+	if saveWorking && s.Changed() {
 		// A complete private copy preserves explicit empty values without editing the committed definition.
 		updates[".env.stack."+s.Active+".local"] = append([]byte(completePrivateHeader), encodeDocument(s.Current)...)
 	}

@@ -58,6 +58,7 @@ Example before:
 ```dotenv
 DB_DRIVER=mysql
 DB_SUPPORTED_DRIVERS=mysql
+DB_DATABASE=app
 CACHE_DRIVER=redis
 CACHE_SUPPORTED_DRIVERS=memory,redis
 COMPOSE_PROFILES=mysql,redis
@@ -68,7 +69,7 @@ After choosing portable defaults and confirming activation:
 ```dotenv
 DB_DRIVER=sqlite
 DB_SUPPORTED_DRIVERS=mysql,sqlite
-DB_DATABASE=./_data/stacks/portable/db.db
+DB_DATABASE=app
 DB_SQLITE_DATABASE=./_data/stacks/portable/db.db
 DB_DSN=
 CACHE_DRIVER=memory
@@ -76,11 +77,11 @@ CACHE_SUPPORTED_DRIVERS=memory,redis
 COMPOSE_PROFILES=
 ```
 
-Portable database settings clear stale DSNs and assign distinct paths to named databases and App overrides. Existing supported drivers remain available in the generated build contract. Run `forj build` after activation to regenerate and compile driver support.
+Portable database settings clear stale DSNs and assign distinct SQLite paths to named databases and App overrides. Generic database names remain private and unchanged, so selecting MySQL or Postgres later does not reuse a SQLite filepath as the database name. Review the target endpoint and credentials when changing service drivers. Existing supported drivers remain available in the generated build contract. Run `forj build` after activation to regenerate and compile driver support.
 
 Switching back to a saved services stack restores its connection settings. Activation preserves unrelated `.env` text, comments, and multiline values. Before every switch, GoForj saves the previous managed settings privately. Restore previous configuration works even when the previous configuration had no stack name. This stores one previous configuration, not an unlimited history.
 
-If the active stack has manual edits, the wizard asks whether to retain them in a private working copy, discard them when leaving, or cancel. Keeping them does not rewrite the shareable definition. A private working copy preserves absent keys as well as explicitly empty values. To deliberately update a shareable definition, save the current configuration under the same name.
+If the active stack has manual edits, the wizard asks whether to retain them in a private working copy, discard them when leaving, or cancel. Keeping them does not rewrite the shareable definition. A private working copy preserves absent keys as well as explicitly empty values. Unchanged Stacks do not acquire a complete private working copy when switching away, so later edits to their shareable definition remain effective. Selecting the already-active Stack leaves current edits untouched. To deliberately update a shareable definition, save the current configuration under the same name; this also marks those settings as saved without replacing recovery history.
 
 The final preview masks connection values and requires confirmation. A failed file replacement rolls back earlier writes. Concurrent changes detected while the wizard was open require starting again. Stack operations use `.env.stack-lock.local`; after an interrupted process, remove a stale lock only after verifying no Stack operation is still running.
 
@@ -89,11 +90,12 @@ The final preview masks connection values and requires confirmation. A failed fi
 ```bash
 forj build --stack portable
 forj customer-portal build --stack portable
+forj build --stack portable ./cmd/customer-portal
 ```
 
 The build reads the shareable definition directly. It does not activate that stack, read its `.local` file, or copy credentials from the current `.env` into the binary. Normal build generation still updates generated source and dependency support.
 
-The selected App's defaults are folded into its binary's base configuration keys. Values use a structured payload, preserving commas and explicitly empty settings. Existing runtime environment precedence remains in place:
+The compiled App's defaults are folded into its binary's base configuration keys. An explicit conventional package such as `./cmd/customer-portal` selects that App's defaults, including when `FORJ_APP` selects another App. Stack builds require one identifiable App package; package patterns, multiple packages, and custom entrypoints are rejected before generation. Build each App separately. Use `--root` to select another project directory; Stack builds reject Go's `-C` flag so generation and compilation stay in the same project. Values use a structured payload, preserving commas and explicitly empty settings. Existing runtime environment precedence remains in place:
 
 1. Existing forced `--env-overrides`, when explicitly supplied.
 2. Runtime process and dotenv configuration, with the existing App overlay rules.

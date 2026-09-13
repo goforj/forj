@@ -404,3 +404,73 @@ func TestStackFilesDoNotTriggerDevEnvironmentRebuilds(t *testing.T) {
 		t.Fatal("unrelated existing runtime layer was suppressed")
 	}
 }
+
+// TestStackWizardSameActiveSelectionPreservesEdits covers reselecting an edited Stack followed by keeping it during a real switch.
+func TestStackWizardSameActiveSelectionPreservesEdits(t *testing.T) {
+	root := stackWizardFixture(t)
+	var output bytes.Buffer
+	for _, input := range []string{"3\nservices\nyes\n", "2\n1\nyes\n"} {
+		if err := (&StackCmd{root: root, ui: moduleRenameTestConsole(input, &output)}).Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(root, ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("DB_PASSWORD=edited\n")...)
+	if err := os.WriteFile(filepath.Join(root, ".env"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&StackCmd{root: root, ui: moduleRenameTestConsole("2\n1\n1\nyes\n", &output)}).Run(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(filepath.Join(root, ".env"))
+	if err != nil || !bytes.Equal(raw, after) {
+		t.Fatal("selecting the active Stack replaced manual edits")
+	}
+	if err := (&StackCmd{root: root, ui: moduleRenameTestConsole("1\n1\n1\n1\nyes\n", &output)}).Run(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := stacks.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values, err := s.Load("services", true)
+	if err != nil || values["DB_PASSWORD"] != "edited" {
+		t.Fatal("kept edits lost after switching away")
+	}
+	if s.Current["DB_DRIVER"] != "sqlite" || s.Previous()["DB_PASSWORD"] != "edited" {
+		t.Fatal("switch did not preserve edited recovery settings")
+	}
+}
+
+// TestStackWizardUnchangedDepartureKeepsDefinitionLive avoids creating a private snapshot that hides future public edits.
+func TestStackWizardUnchangedDepartureKeepsDefinitionLive(t *testing.T) {
+	root := stackWizardFixture(t)
+	var output bytes.Buffer
+	for _, input := range []string{"3\nservices\nyes\n", "2\n1\nyes\n", "1\n1\n1\nyes\n"} {
+		if err := (&StackCmd{root: root, ui: moduleRenameTestConsole(input, &output)}).Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(root, ".env.stack.services")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("COMPOSE_PROFILES=\n")...)
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&StackCmd{root: root, ui: moduleRenameTestConsole("2\n1\nyes\n", &output)}).Run(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := stacks.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Current["COMPOSE_PROFILES"] != "" || s.Current["DB_PASSWORD"] != "must-not-print" {
+		t.Fatal("unchanged departure hid public edits or lost private settings")
+	}
+}

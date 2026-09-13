@@ -84,6 +84,9 @@ func (c *Cmd) Run() error {
 			return fmt.Errorf("this project needs refreshed Stack runtime support; run forj render before building --stack")
 		}
 		c.pipeline.stackEnvironment = c.stackDefaults
+		if _, err := c.stackApp(root); err != nil {
+			return err
+		}
 	}
 	if err := c.validateCompiledEnv(root); err != nil {
 		return err
@@ -159,7 +162,11 @@ func (c *Cmd) buildArgs(root string) ([]string, error) {
 	}
 	var extraLdflags []string
 	if len(c.stackDefaults) > 0 {
-		runtimeDefaults, err := stacks.AppDefaults(root, c.stackDefaults, ActiveApp().Name)
+		app, err := c.stackApp(root)
+		if err != nil {
+			return nil, err
+		}
+		runtimeDefaults, err := stacks.AppDefaults(root, c.stackDefaults, app)
 		if err != nil {
 			return nil, err
 		}
@@ -206,8 +213,14 @@ func (c *Cmd) buildArgs(root string) ([]string, error) {
 
 // hasGoBuildPackageArg reports whether pass-through go build args already name the package to build.
 func hasGoBuildPackageArg(args []string) bool {
+	return len(goBuildPackages(args)) > 0
+}
+
+// goBuildPackages separates explicit targets from flag values so Stack defaults follow the compiled App.
+func goBuildPackages(args []string) []string {
 	flagsWithValue := map[string]struct{}{
 		"-asmflags": {}, "-buildmode": {}, "-compiler": {}, "-gccgoflags": {}, "-gcflags": {},
+		"-covermode": {}, "-coverpkg": {}, "-pgo": {},
 		"-installsuffix": {}, "-ldflags": {}, "-mod": {}, "-modfile": {},
 		"-o": {}, "-overlay": {}, "-p": {}, "-pkgdir": {}, "-tags": {}, "-toolexec": {},
 	}
@@ -217,7 +230,7 @@ func hasGoBuildPackageArg(args []string) bool {
 			continue
 		}
 		if arg == "--" {
-			return i+1 < len(args)
+			return args[i+1:]
 		}
 		if strings.HasPrefix(arg, "-") {
 			if strings.Contains(arg, "=") {
@@ -233,9 +246,9 @@ func hasGoBuildPackageArg(args []string) bool {
 			}
 			continue
 		}
-		return true
+		return args[i:]
 	}
-	return false
+	return nil
 }
 
 // outputArgIndex centralizes output arg index behavior so callers follow the same contract.

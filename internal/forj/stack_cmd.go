@@ -74,6 +74,10 @@ func (c *StackCmd) Run() error {
 		if name == "" {
 			return nil
 		}
+		if name == session.Active {
+			ui.Infof("Stack %s is already active. Current edits are unchanged. Use Change current configuration or Save current configuration as a stack to update it.", name)
+			return nil
+		}
 		values, err := session.Load(name, true)
 		if err != nil {
 			return err
@@ -347,7 +351,7 @@ func activateStack(ui *console.Console, s *stacks.Session, name string, values m
 	ui.Infof("Database contents stay in place. Check target-dialect migrations before starting the App; activation does not translate SQL or transfer data.")
 	ui.Infof("Memory and inproc providers are process-local. The wizard does not stop existing containers.")
 	ui.Infof("A running forj dev session can react to .env changes and run configured startup tasks. Stop it before preparing a database transition.")
-	saveWorking := s.Active != ""
+	saveWorking := false
 	if s.Changed() {
 		choice, err := ui.ChooseIndex("The active stack has manual edits", []string{"Keep edits in its private working copy", "Discard edits when leaving this stack", "Cancel"}, 0)
 		if err != nil {
