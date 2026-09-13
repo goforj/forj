@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // file retains absence and permissions for optimistic concurrency checks and rollback.
@@ -59,6 +60,16 @@ func stage(root string, f file, data []byte) (string, error) {
 
 // commit checks all original files before writing and rolls back a failed replacement.
 func commit(root string, files []file, rename func(string, string) error) error {
+	// Publish ignore rules and recovery files before the active environment so an interrupted process retains the previous configuration.
+	sort.SliceStable(files, func(i, j int) bool {
+		if files[i].name == ".gitignore" {
+			return files[j].name != ".gitignore"
+		}
+		if files[j].name == ".gitignore" {
+			return false
+		}
+		return files[i].name != ".env" && files[j].name == ".env"
+	})
 	staged := make([]string, len(files))
 	defer func() {
 		for _, name := range staged {

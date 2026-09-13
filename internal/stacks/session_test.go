@@ -468,3 +468,37 @@ func TestLocalIsAValidStackName(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestRecoveryIsPublishedBeforeTheActiveEnvironment preserves a discoverable backup if a process is interrupted during publication.
+func TestRecoveryIsPublishedBeforeTheActiveEnvironment(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, ".env", "DB_DRIVER=mysql\n")
+	active, _ := readFile(root, ".env")
+	recovery, _ := readFile(root, stateName)
+	ignore, _ := readFile(root, ".gitignore")
+	active.after = []byte("DB_DRIVER=sqlite\n")
+	recovery.after = []byte(`{"previous":{"DB_DRIVER":"mysql"}}`)
+	ignore.after = []byte(".env.stack-state.local\n")
+	sawActive := false
+	err := commit(root, []file{active, recovery, ignore}, func(from, to string) error {
+		switch filepath.Base(to) {
+		case stateName:
+			if _, err := os.Stat(filepath.Join(root, ".gitignore")); err != nil {
+				t.Fatal("private snapshot published before ignore rules")
+			}
+		case ".env":
+			saved, err := os.ReadFile(filepath.Join(root, stateName))
+			if err != nil || !bytes.Equal(saved, recovery.after) {
+				t.Fatal("active environment published before recovery snapshot")
+			}
+			sawActive = true
+		}
+		return os.Rename(from, to)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawActive {
+		t.Fatal("active file not published")
+	}
+}
